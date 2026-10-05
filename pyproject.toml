@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rasi-world-models"
+version = "2.1.0"
+description = "Randomisation-anchored self-improvement with reserved contrast audits"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24,<3"]
+
+[project.optional-dependencies]
+neural = ["torch>=2.2,<3"]
+
+[project.scripts]
+rasi = "rasi.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["python"]

@@ -1,0 +1,1344 @@
+% R2 Supplementary Information. Drafted 4 October 2026.
+% Notes 1-11: mathematics. Then Supplementary Tables S1-S31 and Supplementary Figures S1-S18 (all Methods are in the main file, as the journal requires).
+% Section 14: Figures S1-S18. Every result cell is a red placeholder until its file exists.
+\documentclass[11pt,a4paper]{article}
+\usepackage[supplementary]{nature-manuscript}
+\usepackage{amsthm,array}
+\graphicspath{{Figures/}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+\newcommand{\Ex}{\mathbb E}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\tbd}[1]{{\color{red}\textbf{[#1]}}}
+\newcommand{\T}{{\color{red}\textbf{[\,]}}}
+\newcommand{\CCI}{\mathrm{CCI}}
+\newcommand{\authorpending}[1]{{\color{red}\textbf{[Author: #1]}}}
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{remark}{Remark}[section]
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\captionsetup{labelformat=simple}
+\captionsetup[figure]{name=Supplementary Fig.}
+\captionsetup[table]{name=Supplementary Table}
+\begin{document}
+{\large Supplementary Information\par}\vspace{1.2em}
+\manuscripttitle{Randomisation-anchored self-improvement of medical world models for treatment decisions}
+\vspace{1.1em}
+{\large Yujing M.\ Jiang$^{1,2}$, Jian Yang$^{3}$, Junhan Wang$^{4}$, Jianjun Xu$^{5,*}$, Hua-Dong Li$^{6,*}$\par}
+\vspace{0.9em}
+{\small\raggedright
+$^{1}$Nuffield Department of Clinical Neurosciences, University of Oxford, Oxford, OX3 9DU, UK.\\
+$^{2}$Google DeepMind, London, N1C 4AG, UK.\\
+$^{3}$\authorpending{affiliation 3, city, postcode, country}.\\
+$^{4}$\authorpending{affiliation 4, city, postcode, country}.\\
+$^{5}$\authorpending{affiliation 5, city, postcode, country}.\\
+$^{6}$\authorpending{affiliation 6, city, postcode, country}.\\
+$^{*}$Correspondence: \authorpending{email for J.X.}; \authorpending{email for H.-D.L.}\par}
+
+\vspace{0.6em}
+
+\tableofcontents
+\clearpage
+
+\section{When a contrast penalty is inert in one-shot fitting}
+Let $X\in\mathbb R^{N\times p}$ be the factual design, $y\in\mathbb R^N$ the outcomes and $B\in\mathbb R^{M\times N}$ a signed incidence matrix mapping factual rows to active-minus-comparator pairs, so that the contrast design is $D=BX$ and the recorded contrasts are $d=By$. The penalised objective is
+\begin{equation}
+L_\lambda(\beta)=N^{-1}\|X\beta-y\|^2+\lambda M^{-1}\|BX\beta-By\|^2 .
+\end{equation}
+\begin{proposition}[Stationarity]
+If $X$ has full column rank and $\hat\beta_0$ is the ordinary least-squares solution, then for every $\lambda>0$, $\hat\beta_\lambda=\hat\beta_0$ if and only if $X^\top B^\top B(X\hat\beta_0-y)=0$.
+\end{proposition}
+\begin{proof}
+The normal equation of $L_\lambda$ is $(X^\top X/N+\lambda X^\top B^\top BX/M)\beta=X^\top y/N+\lambda X^\top B^\top By/M$. Substituting $X^\top(X\hat\beta_0-y)=0$ leaves $\lambda X^\top B^\top B(X\hat\beta_0-y)/M=0$. Positive definiteness of $X^\top X$ gives uniqueness.
+\end{proof}
+Balanced saturated cells with the same participants and pairing multiplicity at every time satisfy the condition, because the summed residual contrast within each active and comparator cell is zero. Complete pairing alone does not: with comparator values $0$ and $10$ and one active value $2$ paired only with the first comparator, cell means $5$ and $2$ give predicted contrast $-3$ against observed $2$, and the gradient is nonzero. In the primary environment the balanced 21-participant subset satisfies the condition to $10^{-12}$ ms; the full 22-participant sample does not exactly, and the measured one-shot difference is $-0.002$ ms (95\% participant-bootstrap interval $-0.011$ to $0.007$; Supplementary Fig.~S2). Ridge changes the condition: with $\eta=0.001$ the pooled contrast MAE of S1 and S2 were 11.77 and 11.85 ms. This note establishes the baseline against which every loop result is read.
+
+\section{Self-training dynamics in linear--Gaussian world models}
+\subsection{Setting}
+Real data $(X_r,y_r)$ with $n_r$ rows. At round $k$ the model with coefficients $\beta_k$ generates synthetic rows $(X_s,y_s^{(k)})$ at inputs chosen by the loop (hidden arms, unobserved doses). The round-$(k{+}1)$ coefficients minimise
+\begin{equation}
+\|X_r\beta-y_r\|^2+\|X_s\beta-y_s^{(k)}\|^2+\eta\|\beta\|^2 .
+\end{equation}
+Write $G_r=X_r^\top X_r$, $G_s=X_s^\top X_s$ and $H=G_r+G_s+\eta I$.
+
+\subsection{Mean rollouts: fixed point and loss of personalisation}
+With $y_s^{(k)}=X_s\beta_k$,
+\begin{equation}\label{eq:map}
+\beta_{k+1}=H^{-1}\left(X_r^\top y_r+G_s\beta_k\right).
+\end{equation}
+\begin{proposition}[Fixed point on the anchored subspace]
+Let $\beta^*$ solve $(G_r+\eta I)\beta^*=X_r^\top y_r$. Then $\beta^*$ is a fixed point of Eq.~\ref{eq:map}; the deviation obeys $\beta_{k+1}-\beta^*=H^{-1}G_s(\beta_k-\beta^*)$; and if round 0 is the real-data ridge fit, $\beta_k=\beta^*$ for every $k$.
+\end{proposition}
+\begin{proof}
+$H^{-1}(X_r^\top y_r+G_s\beta^*)=H^{-1}((G_r+\eta I)\beta^*+G_s\beta^*)=\beta^*$. Subtracting the two normal equations gives the deviation recursion.
+\end{proof}
+\begin{corollary}[Spectral structure]
+$H^{-1}G_s$ has eigenvalues in $[0,1]$. On eigenvectors of $G_r$ with positive eigenvalue (directions real data inform) the map contracts. On the null space of $G_r$ (directions only synthetic data inform) the eigenvalue is $g/(g+\eta)$, where $g$ is the corresponding eigenvalue of $G_s$: exactly one when $\eta=0$ and strictly below one when $\eta>0$.
+\end{corollary}
+\begin{remark}[The benign case]
+Coordinates in the null space of $G_r$ are participant-by-treatment deviations for hidden arms, or function values at an unobserved dose. With deterministic mean rollouts and any regularisation they decay geometrically toward zero, so the hidden arm's prediction reverts to the population effect that visible participants anchor. Mean-rollout self-training cannot create a wrong contrast in a linear model; it erases personalisation. Collapse requires one of the three ingredients below. Numerically (40-line check, seed 0): with an intercept in the design, the anchored coefficient after 10 mean-rollout rounds differed from the real-data ridge fit by $6.8\times10^{-14}$.
+\end{remark}
+
+\subsection{Stochastic rollouts: the unanchored walk}
+Let $\theta_k$ be a null-space coordinate and let round $k$'s $m$ synthetic rows at that coordinate carry $y_s=\theta_k+\epsilon$, $\epsilon\sim N(0,\sigma^2)$. With $c=g/(g+\eta)$, replacement gives $\theta_{k+1}=c(\theta_k+\xi_k)$, $\xi_k=\bar\epsilon\sim N(0,\sigma^2/m)$.
+\begin{proposition}[Unanchored walk]
+(i) Replacement, $\eta=0$: $\Var(\theta_k)=k\sigma^2/m$ and $\Ex|\theta_k-\theta_{\mathrm{true}}|$ is non-decreasing in $k$. (ii) Replacement, $\eta>0$: $\theta_k$ is a stationary AR(1) with mean 0 and variance $c^2\sigma^2/\{m(1-c^2)\}$. (iii) Accumulation: $\theta_k\to\theta_1$ with $\Var(\theta_k-\theta_1)<0.65\,\sigma^2/m$; the error neither grows nor returns.
+\end{proposition}
+\begin{proof}
+(i) sums independent increments; (ii) is the AR(1) stationary variance $c^2\Var(\xi)/(1-c^2)$; (iii) follows from the running mean of independent draws, $\sum_{j\ge2}j^{-2}<0.65$.
+\end{proof}
+Numerical check ($\sigma=8$, $m=5$, 4,000 replicates): observed variance at $k=10,20,30$ was 128.2, 264.6 and 398.1 against 128, 256 and 384 predicted; accumulation plateaued at 20.5.
+
+\subsection{A plausibility verifier biases the walk}
+If each rollout $\theta_k+\epsilon$ is retained with probability $w(\theta_k+\epsilon)$ and retained rollouts are averaged,
+\begin{equation}
+\Ex[\xi_k\mid\theta_k]=\Cov(\epsilon,w)/\Ex[w] .
+\end{equation}
+\begin{proposition}[Verifier drift]
+For a Gaussian-likelihood filter $w(x)=\exp\{-(x-\mu)^2/2s^2\}$ centred on the pooled trajectory $\mu$, the retained-rollout mean is $(s^2\theta_k+\sigma^2\mu)/(s^2+\sigma^2)$, so the increment has mean $-\sigma^2(\theta_k-\mu)/(s^2+\sigma^2)$. A treatment arm whose true response differs from the pooled trajectory drifts toward the null contrast at a rate set by the filter's selectivity $s$.
+\end{proposition}
+This is the mechanism by which self-verification, which prevents factual collapse\cite{fu2025selfverification}, causes contrast collapse: the verifier is blind to treatment and rewards typicality.
+
+\subsection{A contrast anchor bounds the walk}
+\begin{proposition}[AR(1) anchor]
+With an added penalty $\lambda(\theta-a)^2$ toward a real-data value $a$, $\theta_{k+1}=(\lambda a+\theta_k+\xi_k)/(1+\lambda)$ is a stationary AR(1) with mean $a$ and variance $\sigma^2/\{m\lambda(2+\lambda)\}$.
+\end{proposition}
+\begin{proof}
+With $\phi=1/(1+\lambda)$, $\theta_{k+1}-a=\phi(\theta_k-a)+\phi\xi_k$, whose stationary variance is $\phi^2\sigma^2/\{m(1-\phi^2)\}=\sigma^2/\{m\lambda(2+\lambda)\}$.
+\end{proof}
+Numerical check: at $\lambda=0.1,0.3,1,3$ the observed stationary variances were 60.5, 19.5, 4.32 and 0.84 against 60.9, 18.6, 4.27 and 0.85.
+
+\subsection{The audit gate as a reflected walk}
+Let $A_k$ be held-out visible-pair contrast error and $H_k$ hidden-arm error after round $k$. The gate accepts round $k$ only if $A_k-A_{k-1}\le\tau$. If increments satisfy $\Delta A=\rho_{AH}\Delta H+\nu$ with independent noise $\nu$, an accepted round has $\Ex[\Delta H\mid\text{accept}]\le(\tau-\Ex[\nu\mid\text{accept}])/\rho_{AH}$, so expected hidden drift over $K$ rounds is at most $K\tau/\rho_{AH}$ plus a noise term. Gate efficiency therefore depends on $\rho_{AH}$, which is reported for every architecture and scale (Supplementary Tables~S7 and S15).
+
+\section{Partial anchoring and who collapses first}
+\begin{proposition}[Partial anchoring]
+Let a subgroup's treatment coordinate $\theta_g$ be informed by $n_g$ real observations under that treatment, with sample mean $\bar y_g$, and by $n_s$ synthetic rollouts per round from the current model, with per-rollout variance $\sigma^2$. Under replacement and $\eta=0$,
+\begin{equation}
+\theta_{g,k+1}-\bar y_g=\varphi(\theta_{g,k}-\bar y_g)+\varphi\bar\epsilon_k,\qquad \varphi=\frac{n_s}{n_g+n_s},\qquad \Var_\infty(\theta_g)=\frac{\varphi^2}{1-\varphi^2}\,\frac{\sigma^2}{n_s}.
+\end{equation}
+\end{proposition}
+\begin{proof}
+The least-squares estimate is the weighted mean $(n_g\bar y_g+n_s(\theta_{g,k}+\bar\epsilon_k))/(n_g+n_s)$; subtract $\bar y_g$.
+\end{proof}
+The proposition unifies Propositions 2 and 4: $n_g=0$ gives $\varphi=1$ and the unanchored walk; $n_g>0$ is an anchor with $\lambda=n_g/n_s$. Its clinical reading is direct. A group that less often receives a treatment has small $n_g$ for that treatment and many untreated members whose treated arm is rolled out (large $n_s$), so $\varphi$ is close to one and its counterfactual arm under that treatment is the least anchored in the model. If instead real and synthetic counts both scale with the group's overall share $\pi$, $\varphi$ is unchanged and $\Var_\infty\propto1/\pi$, so the walk standard deviation, and to first order $\CCI_K$, scale as $\pi^{-1/2}$. Both predictions are tested in E4 (Supplementary Table~S24; Supplementary Fig.~S11). With ridge $\eta>0$ the small-group coordinate is also shrunk toward the pooled value, trading walk variance for bias toward the population effect, which is itself a subgroup error when effects differ.
+
+\section{Why fresh factual data and accumulation do not help}
+\begin{proposition}[Fresh factual data]
+Let new real rows $X_{\mathrm{new}}$ be added each round. If every row of $X_{\mathrm{new}}$ lies in the row space of $X_r$, then $\mathrm{null}(G_r+X_{\mathrm{new}}^\top X_{\mathrm{new}})=\mathrm{null}(G_r)$, and the dynamics of Propositions 2.2--2.4 on that null space are unchanged.
+\end{proposition}
+\begin{proof}
+For positive semidefinite $G_r$ and $X_{\mathrm{new}}^\top X_{\mathrm{new}}$, $v^\top(G_r+X_{\mathrm{new}}^\top X_{\mathrm{new}})v=0$ if and only if $X_rv=0$ and $X_{\mathrm{new}}v=0$; the second is implied by the first when the rows of $X_{\mathrm{new}}$ lie in the row space of $X_r$.
+\end{proof}
+In model collapse of generative models, real data span the support of the distribution, so fresh or accumulated real data re-anchor every direction\cite{shumailov2024,gerstgrasser2024}. In a world model, new patients observed under the treatments they actually received add rows in the factual row space. They improve factual error and the anchored coordinates but leave the counterfactual arms exactly as unanchored as before. Only data that observe the previously unobserved arm, for example crossover periods, randomised assignment to the other arm or a published randomised contrast used as an anchor, change the null space. Accumulation of synthetic data, which prevents generative collapse, freezes the counterfactual coordinate at its first stochastic draw (Proposition 2.2(iii)); it stops further drift but does not undo the first round's error.
+
+\section{Rollout temperature, horizon and compounding}
+\textbf{Temperature.} For a Gaussian predictive head sampled at temperature $T$, the rollout standard deviation is $T\sigma$, so Proposition 2.2 holds with $\sigma^2$ replaced by $T^2\sigma^2$: $\Var(\theta_k)=kT^2\sigma^2/m$. Temperature zero recovers mean rollouts and the benign case; the collapse index under replacement is predicted to scale linearly in $T$ at fixed $k$. For categorical heads (event transformers, language models) temperature changes the entropy of the sampled sequence rather than a variance; the prediction is monotone but not linear.
+
+\textbf{Horizon.} For autoregressive rollouts of horizon $h$ with linearised one-step dynamics $y_{t+1}=\rho y_t+\epsilon_t$, the variance of the $h$-step rollout around its mean is $\sigma^2(1-\rho^{2h})/(1-\rho^2)$, which increases with $h$. Longer free-running rollouts therefore enter the walk with a larger effective $\sigma^2$ and collapse faster; any one-step bias also compounds. The horizon ablation tests the predicted ordering (Supplementary Table~S17).
+
+\textbf{Synthetic-to-real ratio.} On the null space the ratio does not enter (Proposition 2.2). On partially anchored coordinates it enters through $\varphi=n_s/(n_g+n_s)$ (Note 3), predicting a saturating increase of $\CCI_K$ with the ratio.
+
+\section{Uncertainty-weighted rollouts and ensembles}
+\textbf{Uncertainty weighting converts collapse into shrinkage.} Suppose synthetic rows are down-weighted by $w\in(0,1]$ according to the model's epistemic uncertainty, which is largest on unanchored arms. On the null space with ridge $\eta$, $\theta_{k+1}=c_w(\theta_k+\xi_k)$ with $c_w=wg/(wg+\eta)<c_1$. The walk becomes an AR(1) around zero with smaller variance $c_w^2\sigma^2/\{m(1-c_w^2)\}$, but the coordinate is pulled toward the prior, which for a participant deviation is the population effect and for an unconstrained contrast is the null. Uncertainty weighting therefore reduces walk variance and increases bias toward the null; it does not supply the missing anchor (Supplementary Table~S21; Supplementary Fig.~S8).
+
+\textbf{Ensemble disagreement detects the walk but not verifier drift.} Let ensemble member $j$ carry $\theta^{(j)}_k=\theta_0+D_k+W^{(j)}_k$, where $D_k$ is a deterministic drift common to all members (from a shared verifier) and $W^{(j)}_k$ are independent walks. Disagreement $\Var_j(\theta^{(j)}_k)=\Var(W_k)=k\sigma^2/m$ grows with $k$ under the walk and is independent of $D_k$. Ensemble disagreement\cite{lakshminarayanan2017ensembles} is therefore a label-free detector of stochastic collapse and is blind to verifier-driven collapse; negative-control drift and the contrast audit see both (Supplementary Table~S23).
+
+\section{Neural world models and effective regularisation}
+Gradient descent on least squares, stopped after $T$ steps at learning rate $\gamma$, behaves in each eigendirection of the design approximately as ridge with $\eta_{\mathrm{eff}}\approx(\gamma T)^{-1}$\cite{ali2019earlystopping}. Early stopping on visible factual loss applies an effective penalty tuned to the anchored subspace and uninformed about the unanchored one. With Proposition 2.2 this predicts that neural world models trained with factual early stopping (i) revert hidden-arm personalisation toward the population effect under mean rollouts, (ii) follow an AR(1) walk with shrinkage set by $\eta_{\mathrm{eff}}$ under stochastic rollouts and (iii) show no signature of either in validation curves. For nonlinear networks the null space of $G_r$ is replaced by input regions whose tangent features are nearly orthogonal to those of the real data; the predictions keep their sign but not their constants. Re-initialising each round rather than warm-starting removes the dependence on $\theta_k$ only if the synthetic data do not carry it, which they do; the ablation tests whether re-initialisation changes $\CCI_K$ (Supplementary Table~S22). Treatment decodability from the latent state (linear-probe AUROC) and centred kernel alignment between round-0 and round-$k$ representations\cite{kornblith2019cka} are reported to test whether collapse is accompanied by erosion of treatment information in the latent (Supplementary Table~S26).
+
+\section{Measurement floor, collapse index and equivalence}
+\subsection{Measurement floor}
+Within each training fold, replicate variance $\sigma^2_{\mathrm{rep}}$ is pooled across participant--period--time cells with at least two recordings, weighted by degrees of freedom. For replicate counts $n_{at},n_{a0},n_{0t},n_{00}$ in the four cells of the contrast, the measurement variance is $\sigma^2_{\mathrm{rep}}(n_{at}^{-1}+n_{a0}^{-1}+n_{0t}^{-1}+n_{00}^{-1})$, and $\sqrt{2/\pi}$ times its square root is the expected absolute error under independent Gaussian noise. In the primary environment this is 5.42 ms, 18.5\% of the recorded contrast SD. It is a technical component only: period-to-period biological variation and covariance among the four means are not identified by one exposure per drug\cite{senn2002crossover}.
+\subsection{Inference for $\CCI_k$}
+$\CCI_k=(C_k-C_0)/\phi$ is a paired difference on the same hidden units divided by a fixed scale. Within a mask, participants are bootstrapped with multiplicity retained (2,000 replicates). Across masks and seeds we report the median and 2.5--97.5 percentiles of within-run estimates and fit $\CCI_{k,r}=\alpha_r+\beta_r k+e_{k,r}$ with random intercepts and slopes for mask and seed; the fixed slope is the collapse rate per round. ``$\CCI_K\ge1$ in most masks'' uses the proportion of masks whose within-mask lower 95\% bound exceeds one, with a Wilson interval.
+\subsection{Factual equivalence}
+Decoupling is tested by two one-sided tests\cite{schuirmann1987tost} of $H_0:|\Delta F_K|\ge\delta$ with $\delta=1$ ms in E1 and 1\% of $F_0$ elsewhere; equivalence is declared when both one-sided $p<0.05$. A factual change that is statistically equivalent to zero while $\CCI_K\ge1$ is the operational definition of counterfactual collapse used throughout.
+
+\section{The randomised-anchor audit and misspecified anchors}
+\subsection{Definition}
+A randomised trial reports $\hat\Delta_{\mathrm{RCT}}$ with standard error $s$ for population $P$. For a cohort with baseline variables $V$, the trial-eligible subpopulation is $E=\{i:V_i\text{ satisfies the trial's criteria}\}$. The model's predicted contrast on $E$ is $\hat\Delta_{\mathrm{model}}(E)$ with bootstrap standard error $\hat s$, and $z=(\hat\Delta_{\mathrm{model}}(E)-\hat\Delta_{\mathrm{RCT}})/\sqrt{s^2+\hat s^2}$. Equivalence uses two one-sided tests at the trial's 95\% half-width.
+\subsection{Transportability}
+The audit tests the model if $\Ex[\tau_i\mid i\in E]=\Ex[\tau_i\mid i\in P]$, which holds when effect modifiers are distributed alike in $E$ and $P$ or the effect is homogeneous in them\cite{pearl2014transport,dahabreh2020transport}. We check this partially by comparing the model's subgroup contrasts on $E$ with the trial's reported subgroup estimates; a model that matches the overall anchor but inverts the trial's subgroup ordering fails. Comparisons of emulated and randomised estimates suggest that agreement is achievable but not automatic\cite{rctduplicate2023}.
+\subsection{A wrong anchor can still be better than none}
+If the anchor $a$ is biased by $b$ relative to the true contrast, Proposition 2.4 gives stationary mean squared error $b^2+\sigma^2/\{m\lambda(2+\lambda)\}$. Without an anchor, replacement gives $K\sigma^2/m$ at round $K$. The anchor is preferable whenever
+\begin{equation}
+|b|<b^*=\sqrt{\frac{\sigma^2}{m}\left(K-\frac{1}{\lambda(2+\lambda)}\right)} ,
+\end{equation}
+which grows with the number of rounds. The anchor-misspecification ablation biases the anchor by $\pm0.5$, $\pm1$ and $\pm2$ trial standard errors and tests this threshold (Supplementary Table~S20; Supplementary Fig.~S7).
+
+\section{Negative-control interventions}
+Let $N_i(t)$ be an action with no plausible effect on $Y$ over the horizon. A world model given $N$ as a treatment input implies a contrast $\hat\tau^N_i=\hat Y_i(N=1)-\hat Y_i(N=0)$ whose true value is zero\cite{lipsitch2010}. At round 0, $\hat\tau^N$ measures residual confounding and overfitting; its change across rounds measures unanchored variance directly, because the $N=1$ arm is constrained only by its coincidental co-occurrence with the outcome. Under Proposition 2.2 the negative-control contrast walks with the same per-round variance as any hidden arm, so its variance across seeds estimates $k\sigma^2/m$ without counterfactual truth. It detects spurious effects, not missed real ones, which is why E4, E5 and E7 also inject known effects.
+
+\section{Treatment signal and the factual--contrast bound}
+With $m_a(x)=\Ex[Y\mid X=x,A=a]$ and $m(x)=\Ex[Y\mid X=x]$, the law of total variance gives $R^*_{\mathrm{blind}}-R^*_{\mathrm{aware}}=\Ex\{\Var[m_A(X)\mid X]\}$, and for binary treatment with propensity in $[\epsilon,1-\epsilon]$ squared error in the conditional-mean contrast is bounded by excess factual risk divided by $\epsilon(1-\epsilon)$. Under self-training the bound is uninformative on the unanchored subspace, because excess factual risk is undefined where there are no factual data. This is the formal reason why factual benchmarks cannot detect counterfactual collapse.
+
+
+\section{Precision, power and cohort size}
+The precision of a collapse estimate is set by the number of patients whose hidden arms are scored. Resampling the 87 recorded participant--drug contrasts at two hours gives the cross-participant residual standard deviation of the saturated model, 16.2 ms, and hence an expected hidden-arm error of 12.9 ms at round 0 for a model with no participant-specific information. Drawing participants with replacement to a target cohort size, taking 30\% of their arms as hidden and bootstrapping participants within each draw gives the standard error of the hidden-arm mean absolute error as a function of cohort size (Supplementary Table~\ref{tab:s32}; Supplementary Fig.~S19). It falls as $n^{-1/2}$: 2.10 ms at 22 participants, 1.30 ms at 60 and 1.07 ms at 90. In floor units the smallest collapse detectable at 80\% power in a single mask is 1.08, 0.67 and 0.55; across 50 masks, whose errors are correlated through the shared cohort, the median over masks is the reported statistic and its across-mask interval is the reported uncertainty.
+
+Three consequences follow for cohort planning. First, a cohort of 60 to 90 patients is sufficient to detect a collapse of about half a measurement floor in a single mask, which is the magnitude predicted by Proposition 2.2 after five rounds at $m=5$. Second, subgroup analyses require cohort size rather than mask count: a subgroup holding a quarter of a 90-patient cohort is as large as the whole 22-participant primary environment, so the partial-anchoring prediction of Supplementary Note 3 becomes estimable within a cohort rather than only across simulated shares. Third, the number of treatments per patient matters as much as the number of patients: hidden arms, not patients, are the unit of the estimate, so a cohort of 60 patients with four arms each yields more precision than 90 patients with two.
+
+\section{Retrieval-anchored rollouts and distillation}
+\textbf{Retrieval.} Let the rollout for an unobserved arm be the recorded trajectory of the $k$ nearest real patients who did receive that arm, averaged, rather than a sample from the model. The synthetic row then carries the real value $\bar y_{\mathcal N}$ plus sampling noise $\sigma^2_{\mathrm{real}}/k$, and does not carry $\theta_k$. The round update becomes
+\begin{equation}
+\theta_{k+1}=\frac{n_g\bar y_g+n_s\bar y_{\mathcal N}}{n_g+n_s}+\xi_k,\qquad \Var(\xi_k)=\frac{n_s^2}{(n_g+n_s)^2}\frac{\sigma^2_{\mathrm{real}}}{k},
+\end{equation}
+which has no dependence on the previous round: the walk is replaced by independent draws around a real-data value, and the error is bounded by the bias of the neighbourhood, $|\bar y_{\mathcal N}-\theta_{\mathrm{true}}|$, rather than growing with $k$. Retrieval is therefore an anchor obtained through the rollout mechanism rather than through the loss, and its risk is neighbourhood bias when the nearest patients differ systematically from the target. The prediction registered in H21 is that retrieval at least halves $\CCI_K$; the ablation also reports the neighbourhood size $k$ and the resulting bias.
+
+\textbf{Distillation.} A student trained once on a teacher's rollouts inherits the teacher's counterfactual error without adding a new walk, because the teacher is fixed: a single generation is a bias, not a drift. Recursive distillation, in which each student becomes the next teacher, is exactly the replacement regime of Proposition 2.2 with $m$ equal to the number of distillation samples, and its variance grows linearly in generations. The ablation separates these two cases, which are often described by the same word in practice.
+
+\section{A reused audit can be overfitted}
+The gate's audit statistic is an estimate on a finite set of real pairs. If the same set is scored at every round, and the model or agent is selected on it, the audit becomes an adaptively reused holdout. For an audit set of $n_a$ pairs, the audit statistic has standard error $s_a\approx\sigma_c/\sqrt{n_a}$, and after $R$ selection steps the expected optimistic bias of the best-scoring candidate grows approximately as $s_a\sqrt{2\log R}$. The hidden drift that this bias can conceal is that bias divided by the gate efficiency, so
+\begin{equation}
+\text{concealable drift}\;\approx\;\frac{\sigma_c}{\rho_{AH}}\sqrt{\frac{2\log R}{n_a}} .
+\end{equation}
+Three designs follow. A fixed audit set is safe only when $n_a\gg 2\log R/\varepsilon^2$ for the tolerated drift $\varepsilon$. A rotated audit set, a fresh subset drawn each round from a reserved pool, replaces $R$ by the number of reuses of any one pair. A held-out audit set, scored once at the end, has no adaptive bias at all but gives no feedback during the loop. The experiment in Supplementary Table~\ref{tab:s39} measures all three against an agent that sees the audit score, and Supplementary Table~\ref{tab:s39b} measures the audit-set size needed to hold $\CCI_K$ below 0.4 at fixed $\rho_{AH}$. This is the quantitative version of a simple rule: the contrast data used to audit a self-improving system must be reserved from it, exactly as a test set is reserved from training.
+
+\section{Federated self-training across sites}
+Let $S$ sites each run the loop on their own patients and average their model parameters each round, as in federated averaging. For an unanchored coordinate, site $s$ contributes $\theta^{(s)}_k=\theta_0+D_k+W^{(s)}_k$, where $D_k$ is drift common to all sites, for example from a shared verifier or a shared plausibility prior, and $W^{(s)}_k$ are site-specific walks. The averaged coordinate is $\theta_0+D_k+\bar W_k$ with $\Var(\bar W_k)=k\sigma^2/(mS)$.
+\begin{proposition}[Federated averaging]
+Federated averaging reduces the variance of stochastic counterfactual collapse by a factor $S$ and leaves common drift unchanged. Expected absolute hidden-arm error therefore falls as $S^{-1/2}$ under the stochastic mechanism and not at all under the verifier mechanism.
+\end{proposition}
+The practical reading is uncomfortable: federation makes the harmless-looking mechanism look even more harmless while leaving the mechanism that moves contrasts toward the null untouched, and it does so while making the collapse harder to see at any single site. A federated system therefore needs a contrast audit at the aggregation step, not only at each site. Supplementary Table~\ref{tab:s36} tests the $S^{-1/2}$ prediction at one, three and six sites for both mechanisms.
+
+
+\section{The method and its safe-improvement guarantee}
+\textbf{Algorithm.} Inputs: real data $\mathcal D$; a reserved pool of real paired contrasts $\mathcal A$; a base model $f_0$ trained on $\mathcal D$ alone; acceptance margin $\varepsilon$; rounds $R$.
+\begin{enumerate}\itemsep1pt
+\item \emph{Allocate.} Train a five-member ensemble on the current data. For each unobserved arm $j$, compute the ensemble's disagreement $v_j$ about its contrast and allocate $m_j\propto v_j$ rollouts, so synthetic data go where the model is least determined rather than uniformly.
+\item \emph{Propose rollouts.} For arm $j$, take the recorded trajectories of the $k$ nearest real patients who received that treatment, in the current model's representation, and average them. Discard any candidate whose implied contrast differs from the anchor by more than three anchor standard errors.
+\item \emph{Retrain.} Fit $f_{r+1}$ on real plus accepted synthetic data with the contrast penalty of weight $\lambda$ on visible recorded pairs.
+\item \emph{Audit.} Draw a fresh audit subset $A_r\subset\mathcal A$ and compute the contrast error $\hat C(f_{r+1};A_r)$.
+\item \emph{Accept or revert.} Keep $f_{r+1}$ if $\hat C(f_{r+1};A_r)\le\hat C(f_r;A_r)-\varepsilon$; otherwise restore $f_r$ and resample the allocation. Stop after ten consecutive rejections.
+\end{enumerate}
+The base model $f_0$ is the model a developer would otherwise ship, so every gain is reported against it rather than against a weakened control.
+
+\textbf{Guarantee.} Write $C(f)$ for the true contrast error and $\hat C(f;A)$ for its estimate on an audit set of $n_a$ independent pairs with per-pair error sub-Gaussian with parameter $\sigma_c$.
+\begin{proposition}[Safe improvement]
+Let $f_R$ be the model after $R$ rounds of the algorithm with margin $\varepsilon$, audit sets drawn independently from the reserved pool, and let $\delta\in(0,1)$. Then with probability at least $1-\delta$,
+\begin{equation}
+C(f_R)\;\le\;C(f_0)-\Big(\varepsilon-2\sigma_c\sqrt{\tfrac{\log(2R/\delta)}{n_a}}\Big)\,\cdot\,\#\{\text{accepted rounds}\},
+\end{equation}
+so that whenever $\varepsilon>2\sigma_c\sqrt{\log(2R/\delta)/n_a}$ no accepted model is worse than the base model, and each acceptance is a real improvement of at least the bracketed amount.
+\end{proposition}
+\begin{proof}[Proof sketch]
+A union bound over the $2R$ audit evaluations gives $|\hat C(f;A_r)-C(f)|\le\sigma_c\sqrt{\log(2R/\delta)/n_a}$ simultaneously, by Hoeffding's inequality for sub-Gaussian averages. On that event an accepted round satisfies $C(f_{r+1})\le\hat C(f_{r+1};A_r)+\sigma_c\sqrt{\cdot}\le\hat C(f_r;A_r)-\varepsilon+\sigma_c\sqrt{\cdot}\le C(f_r)-\varepsilon+2\sigma_c\sqrt{\cdot}$, and a rejected round leaves the model unchanged. Telescoping over accepted rounds gives the claim.
+\end{proof}
+Three remarks. The bound degrades as $\sqrt{\log R}$, so a long loop needs a modestly larger audit rather than a proportionally larger one. It requires the audit sets to be drawn from a pool reserved from training, which is why rotation matters (Supplementary Note 14). And it bounds the contrast error, not the factual error, so the factual-equivalence test is reported alongside it rather than implied by it.
+
+\section{Where the improvement comes from}
+A loop that only avoided harm would end at the base model. The method ends above it through three identifiable routes, separated by the component ablation in Supplementary Table~\ref{tab:s44}.
+
+\emph{Shared structure.} Synthetic rows at unobserved arms still constrain parameters shared with observed arms, such as time profiles and dose--response shape. Where those are poorly determined by real data alone, rollouts act as regularisation and reduce variance in the contrast, which is the only route available to the naive loop and the reason its gain is positive for a few rounds before the walk overtakes it.
+
+\emph{Imported real information.} Retrieval replaces a sample from the model's belief with recorded trajectories of similar patients who did receive the treatment. This adds information that was in the data but outside the model's fitted support, so the contrast error can fall below its round-0 value rather than merely stop rising (Supplementary Note 13).
+
+\emph{Directed search.} Allocating rollouts by ensemble disagreement spends the synthetic budget on the arms whose contrasts are least determined, and the acceptance rule keeps only the proposals that pay off on a held-out audit. With an agent in the proposal step the same mechanism searches over architectures and regularisers instead of over rollout allocations.
+
+The decomposition is testable: removing retrieval should remove most of the gain above zero while leaving the loop safe, and removing the acceptance rule should leave the gain in expectation but reintroduce the risk of ending below the base model. Both are registered in H25.
+
+\section{Intuitive demonstrations and sanity tests}
+These are small, checkable demonstrations a reader can reproduce in minutes; they carry no clinical claim and exist so that the mechanism and the method can be seen directly.
+
+\textbf{D1, one unanchored number} (Supplementary Fig.~S25). A single scalar whose true value is 1 is re-estimated for 20 rounds from $m=5$ noisy self-generated draws. Under the naive loop it random-walks away; under a plausibility filter it is pulled to zero; under the anchor it stays; under retrieval it is redrawn around the truth each round; under the full method, which accepts a step only when it improves, the error falls. The panel reports the mean absolute error at the first and last round for each.
+
+\textbf{D2, two real participants} (Supplementary Fig.~S26). The recorded two-hour ranolazine contrasts of the strongest and weakest responder are taken as ground truth, and the loop is run at the measured rollout noise. The naive loop drifts across the 10 ms line in both directions; the anchored loop converges on the recorded value. This is the clinical form of the statistic: the same patient classified differently by a model whose factual accuracy has not changed.
+
+\textbf{D3, placebo against placebo.} Both arms of a contrast are drawn from placebo periods, so the true effect is exactly zero. Any non-zero contrast is model artefact, and its growth across rounds is the walk with no signal present.
+
+\textbf{D4, give the model the answer.} The hidden arms are revealed during training. The contrast error must fall to the measurement floor and stay there; if it does not, the deficit is optimisation or capacity, not anchoring, and the collapse measurement is confounded.
+
+\textbf{D5, permuted treatment labels.} Treatment labels are permuted within participant, destroying the effect while preserving every marginal. The loop should show no collapse beyond the walk's variance, and any systematic drift indicates leakage of outcome information into the treatment channel.
+
+\textbf{D6, oracle gate.} The gate is given the true hidden error instead of the audit estimate. The gap between the oracle gate and the real gate is the price of estimating the audit, and it should close as the audit set grows, which is the empirical counterpart of Supplementary Note 16.
+
+\section*{Supplementary Tables}\addcontentsline{toc}{section}{Supplementary Tables}
+Every result cell shown as a red bracket is filled from the result file named in its caption (Supplementary Table~S31). Recorded values from the primary environment and the one-shot analysis are shown in black.
+\clearpage
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E1 environment.} Counts and the floor are recorded values; mask and round-0 rows are medians over the 50 masks. Fill marked cells from \texttt{e1\_rounds.csv}.}
+\begin{tabularx}{\textwidth}{@{}Y c Y@{}}\toprule
+Quantity & Value & Note\\\midrule
+Source recordings & 5,232 & 5,219 valid QT/RR\\
+Participants & 22 & 11 female, 11 male; every arm observed\\
+Factual cells; contrasts & 1,635; 1,305 & 87 participant--drug pairs\\
+Hidden pairs per mask & 26 & six or seven per drug\\
+Measurement floor & 5.42 ms & 18.5\% of contrast SD\\
+Zero-contrast reference, contrast MAE & 27.65 ms & one-shot, full data\\
+Training-mean contrast reference & 24.16 ms (nMAE 0.824) & evaluated, not assumed\\
+M0 contrast MAE (one-shot) & 11.90 ms & full data\\
+M1 contrast MAE (one-shot) & 11.62 ms on 1,302 pairs & additional input\\
+M0 visible-pair contrast MAE, round 0 & \T & median over masks\\
+M0 hidden-pair contrast MAE, round 0 & \T & cross-participant error\\
+Hidden pairs within 10 ms $\pm$ one floor & \T & per mask, median\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E0: predicted versus observed dynamics.} Medians (IQR) over 200 seeds; ratio = observed/predicted. Fill from \texttt{e0\_theory\_check.csv}.}
+\begin{tabularx}{\textwidth}{@{}Y c c c@{}}\toprule
+Quantity & Predicted & Observed & Ratio\\\midrule
+Anchored coefficient, $\max_k|\beta_k-\beta_0|$, mean rollouts & 0 & \T & ---\\
+$\Var(\theta_{20})$, replace, $m=1$ & $20\sigma^2$ & \T & \T\\
+$\Var(\theta_{20})$, replace, $m=5$ & $4\sigma^2$ & \T & \T\\
+$\Var(\theta_{20})$, replace, $m=25$ & $0.8\sigma^2$ & \T & \T\\
+$\Var(\theta_{20}-\theta_1)$, accumulate, $m=5$ & $<0.13\sigma^2$ & \T & \T\\
+Verifier drift per round at $\theta_k-\mu=\bar\delta$ & $-\sigma^2\bar\delta/(s^2+\sigma^2)$ & \T & \T\\
+Stationary variance, $\lambda=0.3$ & $\sigma^2/(0.69m)$ & \T & \T\\
+Stationary variance, $\lambda=1$ & $\sigma^2/(3m)$ & \T & \T\\
+Stationary variance, $\lambda=3$ & $\sigma^2/(15m)$ & \T & \T\\
+Gate: hidden drift per accepted round & $\le\tau/\rho_{AH}$ & \T & \T\\
+Temperature $T=0.5$, variance ratio to $T=1$ & 0.25 & \T & \T\\
+Horizon 15 vs 1, effective $\sigma^2$ ratio & $(1-\rho^{30})/(1-\rho^{2})$ & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E0: hidden-arm contrast MAE by factor.} Medians (IQR), generator units; $\rho=0.2$, $\tau^2/\bar\delta^2=0.25$, $\eta=0.01$ unless stated. Fill from \texttt{e0\_rounds.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Condition & Round 0 & Round 20 & $\CCI_{20}$ & $\Delta F_{20}$ & Signed bias, round 20\\\midrule
+Mean rollouts, no anchor (control) & \T & \T & \T & \T & \T\\
+Stochastic $m=1$, replace & \T & \T & \T & \T & \T\\
+Stochastic $m=5$, replace & \T & \T & \T & \T & \T\\
+Stochastic $m=25$, replace & \T & \T & \T & \T & \T\\
+Stochastic $m=5$, accumulate & \T & \T & \T & \T & \T\\
+Plausibility verifier, $m=5$ & \T & \T & \T & \T & \T\\
+Anchor $\lambda=0.1$ & \T & \T & \T & \T & \T\\
+Anchor $\lambda=0.3$ & \T & \T & \T & \T & \T\\
+Anchor $\lambda=1$ & \T & \T & \T & \T & \T\\
+Anchor $\lambda=3$ & \T & \T & \T & \T & \T\\
+Audit gate, $\tau$ = one floor & \T & \T & \T & \T & \T\\
+$\rho=0.02$, $m=5$ & \T & \T & \T & \T & \T\\
+$\rho=0.6$, $m=5$ & \T & \T & \T & \T & \T\\
+$\tau^2/\bar\delta^2=0$, $m=5$ & \T & \T & \T & \T & \T\\
+$\tau^2/\bar\delta^2=1$, $m=5$ & \T & \T & \T & \T & \T\\
+$\eta=0$, $m=5$ & \T & \T & \T & \T & \T\\
+$\eta=0.1$, $m=5$ & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Model zoo.} Twenty-two architectures in five families. ``Unanchored capacity names the component that can carry an arm-specific prediction not constrained by real data; M0 has none and is the negative-control model. Parameter counts are filled from the delivered configurations.}
+\begin{tabularx}{\textwidth}{@{}p{1.7cm} Y c p{2.3cm} p{2.4cm} p{1.7cm} c@{}}\toprule
+Family & Architecture & Ref. & Rollout source & Unanchored capacity & Environments & Parameters\\\midrule
+Statistical & M0 saturated drug--time mean & this work & residual Gaussian & none (negative-control model) & E1 & \T\\
+ & M1 concentration--QTc mixed model & \cite{garnett2018cqtc} & random-effect draw + residual & participant slope & E1 & \T\\
+ & M2 ridge participant-by-drug deviation & this work & residual Gaussian & participant $\times$ drug & E1 & \T\\
+ & Bayesian hierarchical model & this work & posterior predictive & partially pooled effects & E1, E3, E5, E6 & \T\\
+ & Counterfactual Gaussian process & \cite{schulam2017cgp} & GP posterior sample & kernel over patients & E1, E4, E5 & \T\\
+Causal sequence & RMSN & \cite{lim2018rmsn} & Gaussian head & recurrent state & E1, E4, E5 & \T\\
+ & CRN & \cite{bica2020crn} & Gaussian head & balanced representation & E1, E4, E5 & \T\\
+ & G-Net & \cite{li2021gnet} & simulated covariates + outcome & recurrent state & E1, E4, E5 & \T\\
+ & Causal Transformer & \cite{causaltransformer2022} & Gaussian head & attention over history & E1, E4, E5 & \T\\
+ & TE-CDE & \cite{seedat2022tecde} & Gaussian head & controlled ODE state & E1, E4 & \T\\
+Latent/generative & GRU world model & this work & Gaussian head & participant embedding & E1, E3--E6 & \T\\
+ & RSSM (Dreamer family) & \cite{hafner2025dreamer} & latent prior sample & stochastic latent & E1, E4, E5, E7 & \T\\
+ & Latent ODE & \cite{rubanova2019latentode} & latent initial-state sample & latent dynamics & E1, E4, E5, E7 & \T\\
+ & JEPA-style latent predictor & \cite{clinjepa2026} & latent + decoder noise & latent predictor & E1, E4, E7 & \T\\
+ & Conditional diffusion trajectory model & \cite{tashiro2021csdi} & reverse-diffusion sample & score network & E1, E4, E5, E7 & \T\\
+Foundation-style & Decoder-only event transformer ($10^4$--$10^9$) & this work & token sampling at $T$ & context and width & E1, E4, E5, E9 & \T\\
+ & Language-model world model (low-rank adapted) & \cite{hu2022lora} & token sampling at $T$ & adapter and base model & E1, E3, E6 & \T\\
+Static learners & S-, T- and X-learners & \cite{kunzel2019xlearner} & pseudo-outcome + residual & base learner & E1, E3, E6 & \T\\
+ & DR-learner & \cite{kennedy2023drlearner} & pseudo-outcome + residual & second-stage learner & E1, E3, E6 & \T\\
+ & Causal forest & \cite{wager2018} & pseudo-outcome + residual & forest leaves & E1, E3, E6 & \T\\
+ & Bayesian causal forest & \cite{hahn2020bcf} & posterior predictive & effect forest & E1, E3, E6 & \T\\
+ & TARNet and DragonNet & \cite{shalit2017tarnet,shi2019dragonnet} & Gaussian head & treatment heads & E1, E3, E6 & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{E1: all 22 architectures.} Stochastic $m=5$, replacement, no verifier; medians with 2.5--97.5 percentiles over 50 masks (statistical models) or 10 masks $\times$ 20 seeds (others). Seed SD is the across-seed SD of $\CCI_{15}$ at fixed mask. Fill from \texttt{e1\_rounds.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C C@{}}\toprule
+Architecture & Visible factual MAE $0\to15$ & Hidden MAE $0\to15$ & $\CCI_{15}$ & $k^*$ & Seed SD & $\CCI_{15}$, gate\\\midrule
+M0 saturated drug--time mean & \T & \T & \T & \T & \T & \T\\
+M1 concentration--QTc mixed model & \T & \T & \T & \T & \T & \T\\
+M2 ridge participant-by-drug deviation & \T & \T & \T & \T & \T & \T\\
+Bayesian hierarchical model & \T & \T & \T & \T & \T & \T\\
+Counterfactual Gaussian process & \T & \T & \T & \T & \T & \T\\
+RMSN & \T & \T & \T & \T & \T & \T\\
+CRN & \T & \T & \T & \T & \T & \T\\
+G-Net & \T & \T & \T & \T & \T & \T\\
+Causal Transformer & \T & \T & \T & \T & \T & \T\\
+TE-CDE & \T & \T & \T & \T & \T & \T\\
+GRU world model & \T & \T & \T & \T & \T & \T\\
+RSSM (Dreamer family) & \T & \T & \T & \T & \T & \T\\
+Latent ODE & \T & \T & \T & \T & \T & \T\\
+JEPA-style latent predictor & \T & \T & \T & \T & \T & \T\\
+Conditional diffusion trajectory model & \T & \T & \T & \T & \T & \T\\
+Decoder-only event transformer ($10^4$--$10^9$) & \T & \T & \T & \T & \T & \T\\
+Language-model world model (low-rank adapted) & \T & \T & \T & \T & \T & \T\\
+S-, T- and X-learners & \T & \T & \T & \T & \T & \T\\
+DR-learner & \T & \T & \T & \T & \T & \T\\
+Causal forest & \T & \T & \T & \T & \T & \T\\
+Bayesian causal forest & \T & \T & \T & \T & \T & \T\\
+TARNet and DragonNet & \T & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E1: hidden pairs by drug,} M2 ($\eta=0.1$), stochastic $m=5$, replacement. Flip proportions with Wilson intervals; each hidden pair counted once per mask. Fill from \texttt{e1\_hidden\_pairs.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Drug, condition & Hidden pairs & Hidden MAE $0\to15$ & Flips at 10 ms $0\to15$ & Calibration slope $0\to15$ & $\CCI_{15}$\\\midrule
+Dofetilide, no remedy & \T & \T & \T & \T & \T\\
+Quinidine, no remedy & \T & \T & \T & \T & \T\\
+Ranolazine, no remedy & \T & \T & \T & \T & \T\\
+Verapamil, no remedy & \T & \T & \T & \T & \T\\
+\midrule
+Dofetilide, verifier & \T & \T & \T & \T & \T\\
+Quinidine, verifier & \T & \T & \T & \T & \T\\
+Ranolazine, verifier & \T & \T & \T & \T & \T\\
+Verapamil, verifier & \T & \T & \T & \T & \T\\
+\midrule
+Dofetilide, gate & \T & \T & \T & \T & \T\\
+Quinidine, gate & \T & \T & \T & \T & \T\\
+Ranolazine, gate & \T & \T & \T & \T & \T\\
+Verapamil, gate & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E1: anchor and gate sweep.} $\rho_{AH}$: correlation of visible-pair and hidden-pair error increments. Fill from \texttt{e1\_rounds.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Architecture, condition & Hidden MAE at 15 & $\CCI_{15}$ & Gate acceptance & $\rho_{AH}$ & AR(1) prediction\\\midrule
+M2, $\lambda=0$ & \T & \T & \T & \T & \T\\
+M2, $\lambda=0.3$ & \T & \T & \T & \T & \T\\
+M2, $\lambda=1$ & \T & \T & \T & \T & \T\\
+M2, $\lambda=3$ & \T & \T & \T & \T & \T\\
+M2, gate $\tau=5.42$ ms & \T & \T & \T & \T & \T\\
+M2, gate $\tau=2.71$ ms & \T & \T & \T & \T & \T\\
+GRU, $\lambda=1$ & \T & \T & \T & \T & \T\\
+GRU, gate $\tau=5.42$ ms & \T & \T & \T & \T & \T\\
+Causal Transformer, gate & \T & \T & \T & \T & \T\\
+RSSM, gate & \T & \T & \T & \T & \T\\
+Diffusion, gate & \T & \T & \T & \T & \T\\
+Language-model world model, gate & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E2: transfer to the independent lower-dose crossover.} Contrast MAE with participant-bootstrap 95\% intervals; calibration slope observed on predicted. Round-0 M1 values are the recorded one-shot analysis. Fill from \texttt{e2\_transfer.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Architecture, condition & MAE, round 0 & MAE, round 15 & Slope $0\to15$ & Rollouts at 250 microgram scored\\\midrule
+M1, no remedy & 9.64 (6.15--14.04) & \T & \T & yes\\
+M1, gate & 9.64 (6.15--14.04) & \T & \T & yes\\
+GRU with concentration, no remedy & \T & \T & \T & yes\\
+GRU with concentration, gate & \T & \T & \T & yes\\
+RSSM with concentration, no remedy & \T & \T & \T & yes\\
+M0 drug--time (support stress test) & 46.27 (41.02--51.74) & \T & \T & no\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E3: randomised stroke trial, hidden strata.} RD, risk difference for 6-month death or dependency in percentage points. Fill from \texttt{e3\_rounds.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Model, condition & Factual log-loss $0\to15$ & Hidden-stratum RD error $0\to15$ & Strata outside trial 95\% CI & Negative-control RD $0\to15$ & $\CCI_{15}$\\\midrule
+Gradient boosting, no remedy & \T & \T & \T & \T & \T\\
+Gradient boosting, verifier & \T & \T & \T & \T & \T\\
+Gradient boosting, anchor $\lambda=1$ & \T & \T & \T & \T & \T\\
+Gradient boosting, gate & \T & \T & \T & \T & \T\\
+Neural tabular, no remedy & \T & \T & \T & \T & \T\\
+Neural tabular, gate & \T & \T & \T & \T & \T\\
+Bayesian hierarchical, no remedy & \T & \T & \T & \T & \T\\
+Language-model world model, no remedy & \T & \T & \T & \T & \T\\
+Language-model world model, gate & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E4: intensive care.} Mean arterial pressure in mmHg. Fill from \texttt{e4\_rounds.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Model, condition & Factual MAE $0\to10$ & Negative-control contrast $0\to10$ & Injected-effect error $0\to10$ & Natural-crossover agreement & $\CCI_{10}$\\\midrule
+GRU, no remedy & \T & \T & \T & \T & \T\\
+GRU, verifier & \T & \T & \T & \T & \T\\
+GRU, anchor on injected pairs & \T & \T & \T & \T & \T\\
+GRU, gate on negative control & \T & \T & \T & \T & \T\\
+Transformer, no remedy & \T & \T & \T & \T & \T\\
+Transformer, gate & \T & \T & \T & \T & \T\\
+RSSM, no remedy & \T & \T & \T & \T & \T\\
+Diffusion, no remedy & \T & \T & \T & \T & \T\\
+CRN, no remedy & \T & \T & \T & \T & \T\\
+Causal Transformer, no remedy & \T & \T & \T & \T & \T\\
+Counterfactual GP, no remedy & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E5: chronic kidney disease.} eGFR in mL/min/1.73 m$^2$. Fill from \texttt{e5\_rounds.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Model, condition & Factual MAE $0\to10$ & Negative-control contrast $0\to10$ & Anchor distance $z$, $0\to10$ & Injected recovery $0\to10$ & $\CCI_{10}$\\\midrule
+Mixed model, no remedy & \T & \T & \T & \T & \T\\
+Mixed model, gate & \T & \T & \T & \T & \T\\
+GRU, no remedy & \T & \T & \T & \T & \T\\
+GRU, verifier & \T & \T & \T & \T & \T\\
+GRU, gate on anchor & \T & \T & \T & \T & \T\\
+Latent ODE, no remedy & \T & \T & \T & \T & \T\\
+Event transformer, no remedy & \T & \T & \T & \T & \T\\
+Event transformer, gate & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E6: neoadjuvant breast cancer.} pCR differences in percentage points; trial anchor 13.6 (5.4--21.8). Only aggregate statistics are reported. Fill from \texttt{e6\_audit.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Model, condition & Factual log-loss $0\to10$ & Eligible-stratum contrast $0\to10$ & $z_0\to z_{10}$ & Subgroup order preserved & Negative control $0\to10$\\\midrule
+Gradient boosting, no remedy & \T & \T & \T & \T & \T\\
+Gradient boosting, verifier & \T & \T & \T & \T & \T\\
+Gradient boosting, gate on anchor & \T & \T & \T & \T & \T\\
+Bayesian causal forest, no remedy & \T & \T & \T & \T & \T\\
+Neural tabular, no remedy & \T & \T & \T & \T & \T\\
+Neural tabular, gate on anchor & \T & \T & \T & \T & \T\\
+Language-model world model, no remedy & \T & \T & \T & \T & \T\\
+Language-model world model, gate on anchor & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E7: imaging world models.} Fill from \texttt{e7\_rounds.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Model, condition & Reconstruction error $0\to10$ & Injected-response recovery $0\to10$ & Negative control $0\to10$ & Anchor $z$ (CT) & $\CCI_{10}$\\\midrule
+CT tumour world model, no remedy & \T & \T & \T & \T & \T\\
+CT tumour world model, verifier & \T & \T & \T & \T & \T\\
+CT tumour world model, gate on anchor & \T & \T & \T & \T & \T\\
+CT, RSSM backbone, no remedy & \T & \T & \T & \T & \T\\
+MRI glioma model, no remedy & \T & \T & \T & --- & \T\\
+MRI glioma model, gate on negative control & \T & \T & \T & --- & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{E8: agentic runs.} Medians over five runs (range). Goodhart events: iterations in which the seen score improved and the hidden score worsened. Fill from \texttt{e8\_iterations.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Environment, agent, condition & Seen score change & Hidden score change & Goodhart events / 50 & Runs adding augmentation & Runs excluded (leakage)\\\midrule
+QT, agent A, F (runs 1--5) & \T & \T & \T & \T & \T\\
+QT, agent A, C (runs 1--5) & \T & \T & \T & \T & \T\\
+QT, agent B, F (runs 1--5) & \T & \T & \T & \T & \T\\
+QT, agent B, C (runs 1--5) & \T & \T & \T & \T & \T\\
+QT, agent C, F (runs 1--5) & \T & \T & \T & \T & \T\\
+QT, agent C, C (runs 1--5) & \T & \T & \T & \T & \T\\
+\midrule
+Breast cancer, agent A, F (runs 1--5) & \T & \T & \T & \T & \T\\
+Breast cancer, agent A, C (runs 1--5) & \T & \T & \T & \T & \T\\
+Breast cancer, agent B, F (runs 1--5) & \T & \T & \T & \T & \T\\
+Breast cancer, agent B, C (runs 1--5) & \T & \T & \T & \T & \T\\
+Breast cancer, agent C, F (runs 1--5) & \T & \T & \T & \T & \T\\
+Breast cancer, agent C, C (runs 1--5) & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E9: collapse versus model size.} Medians (IQR) over 50 runs per size. Fill from \texttt{e9\_rounds.csv}.}
+\begin{tabularx}{\textwidth}{@{}c C C C C c C C@{}}\toprule
+Parameters & Tokens & Factual MAE, round 0 & $\Delta F_{10}$ & $\CCI_{10}$ & $k^*$ & $\rho_{AH}$ & $\CCI_{10}$, gate\\\midrule
+$10^4$ & \T & \T & \T & \T & \T & \T & \T\\
+$10^5$ & \T & \T & \T & \T & \T & \T & \T\\
+$10^6$ & \T & \T & \T & \T & \T & \T & \T\\
+$10^7$ & \T & \T & \T & \T & \T & \T & \T\\
+$10^8$ & \T & \T & \T & \T & \T & \T & \T\\
+$10^9$ & \T & \T & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Ablation design.} One factor changed at a time from the primary specification; 20 seeds $\times$ 10 masks per level; predictions registered with each ablation.}
+\begin{tabularx}{\textwidth}{@{}p{2.6cm} Y Y p{1.4cm}@{}}\toprule
+Ablation & Levels & Registered prediction & Source\\\midrule
+Rollout temperature & 0, 0.25, 0.5, 1, 1.5 & $\CCI$ linear in $T$; zero at $T=0$ & Note 5\\
+Synthetic : real ratio & 0.1, 0.5, 1, 2, 5, 10 & saturating increase & Note 5\\
+Rollout horizon & 1, 3, 6, 15 steps & increases with horizon & Note 5\\
+Data regime & replace; accumulate; decay; fresh real; fresh real + gate & fresh real data do not help & H10; Note 4\\
+Verifier family & none; likelihood; discriminator; self-consistency; physiological; contrast-aware & plausibility verifiers increase, contrast-aware prevents & H11; Note 2\\
+Gate design & $\tau$ 0.5, 1, 2 floors; patience 0, 1, 2; revert vs freeze & bounded by $\tau/\rho_{AH}$ & Note 2\\
+Anchor misspecification & bias $-2$ to $+2$ trial SE & better than none for $|b|<b^*$ & Note 9\\
+Uncertainty weighting & none; deep ensemble; MC dropout & lower variance, more null bias & H12; Note 6\\
+Participant-embedding dimension & 0, 2, 4, 16, 64 & increases with capacity; zero at 0 & H13\\
+Treatment conditioning & concatenation; FiLM; cross-attention; late fusion & exploratory & ---\\
+Initialisation per round & warm start; re-initialise & little change & Note 7\\
+Early-stopping criterion & factual; factual + visible contrast & combined criterion reduces collapse & Note 7\\
+Language-model adaptation & adapter rank 8, 32, 128; temperature 0.5, 1, 1.5 & increases with rank and temperature & Note 5\\
+Data level & hidden fraction 0.1--0.5; 11, 16, 22 participants; $\rho_{\mathrm{tx}}$ 0.02, 0.2, 0.6 & increases with hidden fraction & Note 3\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Rollout and data ablations.} Medians (IQR) over 200 runs per level. Fill from \texttt{ablations.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Level & $\CCI_{15}$, M2 & $\CCI_{15}$, GRU & $\Delta F_{15}$ & $k^*$ & Matches prediction\\\midrule
+Temperature 0 & \T & \T & \T & \T & \T\\
+Temperature 0.25 & \T & \T & \T & \T & \T\\
+Temperature 0.5 & \T & \T & \T & \T & \T\\
+Temperature 1 & \T & \T & \T & \T & \T\\
+Temperature 1.5 & \T & \T & \T & \T & \T\\
+\midrule
+Synthetic : real 0.1 & \T & \T & \T & \T & \T\\
+Synthetic : real 0.5 & \T & \T & \T & \T & \T\\
+Synthetic : real 1 & \T & \T & \T & \T & \T\\
+Synthetic : real 2 & \T & \T & \T & \T & \T\\
+Synthetic : real 5 & \T & \T & \T & \T & \T\\
+Synthetic : real 10 & \T & \T & \T & \T & \T\\
+\midrule
+Horizon 1 & \T & \T & \T & \T & \T\\
+Horizon 3 & \T & \T & \T & \T & \T\\
+Horizon 6 & \T & \T & \T & \T & \T\\
+Horizon 15 & \T & \T & \T & \T & \T\\
+\midrule
+Hidden fraction 0.1 & \T & \T & \T & \T & \T\\
+Hidden fraction 0.2 & \T & \T & \T & \T & \T\\
+Hidden fraction 0.3 & \T & \T & \T & \T & \T\\
+Hidden fraction 0.4 & \T & \T & \T & \T & \T\\
+Hidden fraction 0.5 & \T & \T & \T & \T & \T\\
+\midrule
+Participants 11 & \T & \T & \T & \T & \T\\
+Participants 16 & \T & \T & \T & \T & \T\\
+Participants 22 & \T & \T & \T & \T & \T\\
+\midrule
+$\rho_{\mathrm{tx}}$ 0.02 & \T & \T & \T & \T & \T\\
+$\rho_{\mathrm{tx}}$ 0.2 & \T & \T & \T & \T & \T\\
+$\rho_{\mathrm{tx}}$ 0.6 & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Data regime.} Fresh real data: new real patients observed under their received treatment are added each round (Note 4). Fill from \texttt{ablations.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Regime & $\CCI_{15}$, M2 & $\CCI_{15}$, GRU & $\Delta F_{15}$ & Factual MAE at 15\\\midrule
+Replace & \T & \T & \T & \T\\
+Accumulate & \T & \T & \T & \T\\
+Accumulate with exponential decay & \T & \T & \T & \T\\
+Fresh real data each round & \T & \T & \T & \T\\
+Fresh real data + gate & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Verifier family.} Bias toward null: mean shrinkage of hidden contrasts toward zero at round 15. Fill from \texttt{ablations.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Verifier & Acceptance rate & $\CCI_{15}$ & Bias toward null & $\Delta F_{15}$\\\midrule
+None & \T & \T & \T & \T\\
+Gaussian likelihood (top 50\%) & \T & \T & \T & \T\\
+Discriminator (real vs synthetic) & \T & \T & \T & \T\\
+Self-consistency across rollouts & \T & \T & \T & \T\\
+Physiological range & \T & \T & \T & \T\\
+Contrast-aware (anchor-consistent) & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Anchor misspecification and gate design.} $b^*$ from Supplementary Note 9. Fill from \texttt{ablations.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Setting & $\CCI_{15}$ & Better than no anchor? & Predicted by $|b|<b^*$? & Gate acceptance\\\midrule
+Anchor bias $-2$ SE & \T & \T & \T & \T\\
+Anchor bias $-1$ SE & \T & \T & \T & \T\\
+Anchor bias $-0.5$ SE & \T & \T & \T & \T\\
+Anchor unbiased & \T & \T & \T & \T\\
+Anchor bias $+0.5$ SE & \T & \T & \T & \T\\
+Anchor bias $+1$ SE & \T & \T & \T & \T\\
+Anchor bias $+2$ SE & \T & \T & \T & \T\\
+\midrule
+Gate $\tau=0.5$ floor & \T & \T & \T & \T\\
+Gate $\tau=1$ floor & \T & \T & \T & \T\\
+Gate $\tau=2$ floors & \T & \T & \T & \T\\
+Gate patience 1 & \T & \T & \T & \T\\
+Gate patience 2 & \T & \T & \T & \T\\
+Gate freeze instead of revert & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Uncertainty-weighted self-training.} Walk SD and null bias relative to unweighted replacement. Fill from \texttt{uncertainty\_weighting.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Weighting & Walk SD (relative) & Bias toward null (relative) & $\CCI_{15}$ & $\Delta F_{15}$\\\midrule
+None & \T & \T & \T & \T\\
+Deep ensemble (5 members) & \T & \T & \T & \T\\
+MC dropout (20 passes) & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Architecture and optimisation ablations.} GRU unless stated. Fill from \texttt{ablations.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Setting & $\CCI_{15}$ & $k^*$ & $\Delta F_{15}$ & Visible factual MAE\\\midrule
+Embedding dimension 0 & \T & \T & \T & \T\\
+Embedding dimension 2 & \T & \T & \T & \T\\
+Embedding dimension 4 & \T & \T & \T & \T\\
+Embedding dimension 16 & \T & \T & \T & \T\\
+Embedding dimension 64 & \T & \T & \T & \T\\
+\midrule
+Conditioning: concatenation & \T & \T & \T & \T\\
+Conditioning: FiLM & \T & \T & \T & \T\\
+Conditioning: cross-attention & \T & \T & \T & \T\\
+Conditioning: late fusion & \T & \T & \T & \T\\
+\midrule
+Warm start each round & \T & \T & \T & \T\\
+Re-initialise each round & \T & \T & \T & \T\\
+\midrule
+Early stopping: factual & \T & \T & \T & \T\\
+Early stopping: factual + visible contrast & \T & \T & \T & \T\\
+\midrule
+Language model: adapter rank 8 & \T & \T & \T & \T\\
+Language model: adapter rank 32 & \T & \T & \T & \T\\
+Language model: adapter rank 128 & \T & \T & \T & \T\\
+Language model: temperature 0.5 & \T & \T & \T & \T\\
+Language model: temperature 1.5 & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Label-free monitors.} AUROC for predicting $\CCI_K\ge1$ from the monitor at round $k$, overall and by mechanism; false-alarm rate at 90\% sensitivity; lead time before $k^*$ at 95\% specificity. Fill from \texttt{detectors.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Monitor & AUROC, all & AUROC, stochastic & AUROC, verifier & False-alarm rate & Lead time, rounds\\\midrule
+Factual validation loss & \T & \T & \T & \T & \T\\
+Factual drift test & \T & \T & \T & \T & \T\\
+Rollout diversity & \T & \T & \T & \T & \T\\
+Ensemble disagreement & \T & \T & \T & \T & \T\\
+Negative-control drift & \T & \T & \T & \T & \T\\
+Visible-pair contrast audit & \T & \T & \T & \T & \T\\
+Randomised-anchor distance & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Subgroups.} Predicted $\CCI_K$ from Supplementary Note 3 for the retained-share experiment. Fill from \texttt{subgroups.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Environment, subgroup & Patients & $\CCI_K$ & Predicted $\CCI_K$ & $\Delta F_K$\\\midrule
+E1, female & \T & \T & \T & \T\\
+E1, male & \T & \T & \T & \T\\
+\midrule
+E4, age $<$65 & \T & \T & \T & \T\\
+E4, age 65--79 & \T & \T & \T & \T\\
+E4, age $\ge$80 & \T & \T & \T & \T\\
+E4, recorded group 1 & \T & \T & \T & \T\\
+E4, recorded group 2 & \T & \T & \T & \T\\
+E4, recorded group 3 & \T & \T & \T & \T\\
+\midrule
+E4, treated stays retained 100\% & \T & \T & \T & \T\\
+E4, retained 50\% & \T & \T & \T & \T\\
+E4, retained 25\% & \T & \T & \T & \T\\
+E4, retained 10\% & \T & \T & \T & \T\\
+\midrule
+E6, triple-negative & \T & \T & \T & \T\\
+E6, HER2-positive & \T & \T & \T & \T\\
+E6, hormone-receptor-positive & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Decision impact.} Recommendation flip rate between rounds 0 and $K$ (\%), and silent reversals (\%; flips with factual error change below one floor). Fill from \texttt{decisions.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C C@{}}\toprule
+Environment & Flips, none & Flips, verifier & Flips, anchor & Flips, gate & Silent, none & Silent, gate\\\midrule
+E1 QT (drug ranking) & \T & \T & \T & \T & \T & \T\\
+E3 stroke (aspirin) & \T & \T & \T & \T & \T & \T\\
+E4 intensive care (vasopressor vs fluid) & \T & \T & \T & \T & \T & \T\\
+E6 breast cancer (PD-1 blockade) & \T & \T & \T & \T & \T & \T\\
+E7 CT (TACE combination) & \T & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Representation analysis.} Probe AUROC: treatment decoded from latent state; CKA to round 0. Fill from \texttt{representation.csv}.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C@{}}\toprule
+Model, condition & Probe AUROC $0\to K$ & CKA, factual inputs, $K$ & CKA, counterfactual inputs, $K$\\\midrule
+GRU, no remedy & \T & \T & \T\\
+GRU, gate & \T & \T & \T\\
+Causal Transformer, no remedy & \T & \T & \T\\
+Causal Transformer, gate & \T & \T & \T\\
+RSSM, no remedy & \T & \T & \T\\
+RSSM, gate & \T & \T & \T\\
+Language-model world model, no remedy & \T & \T & \T\\
+Language-model world model, gate & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Factual equivalence.} $\Delta F_K$ with 90\% interval; margin $\delta$ = 1 ms (E1) or 1\% of $F_0$; equivalence by two one-sided tests. Fill from the round files.}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Environment, model & $\Delta F_K$ (90\% CI) & $\delta$ & TOST $p$ & Equivalent & $\CCI_K$\\\midrule
+E1, M2 & \T & \T & \T & \T & \T\\
+E1, GRU & \T & \T & \T & \T & \T\\
+E1, language-model world model & \T & \T & \T & \T & \T\\
+E3, gradient boosting & \T & \T & \T & \T & \T\\
+E4, GRU & \T & \T & \T & \T & \T\\
+E5, GRU & \T & \T & \T & \T & \T\\
+E6, gradient boosting & \T & \T & \T & \T & \T\\
+E7, CT world model & \T & \T & \T & \T & \T\\
+E7, MRI model & \T & \T & \T & \T & \T\\
+E9, $10^9$ parameters & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Sensitivity analyses on the primary environment.} Each row changes one thing relative to the primary specification. Fill from \texttt{e1\_sensitivity.csv}.}
+\begin{tabularx}{\textwidth}{@{}Y c c@{}}\toprule
+Analysis & $\CCI_{15}$ (median, range) & Conclusion changed?\\\midrule
+Hidden fraction 10--50\% & \T & \T\\
+Rounds $K$ = 5, 15, 30, 60 & \T & \T\\
+Rollouts per arm 1, 5, 25, 100 & \T & \T\\
+Rollout noise: Gaussian; Student-$t_3$; residual bootstrap & \T & \T\\
+Verifier selectivity 25--100\% & \T & \T\\
+Gate threshold 0.5, 1, 2 floors & \T & \T\\
+Regularisation $\eta$ = 0, 0.01, 0.1, 1 & \T & \T\\
+QTc formula: Fridericia; Bazett; Framingham & \T & \T\\
+Outliers: none; exclude $|\Delta$QTcF$|>$120 ms & \T & \T\\
+Participants 11, 16, 22 & \T & \T\\
+Hidden arms: random; largest effects only; smallest only & \T & \T\\
+Mask stratification: by drug; unstratified & \T & \T\\
+Anchor: population; within-participant other-arm slope & \T & \T\\
+Treatment labels permuted within participant (null) & \T & \T\\
+Evaluation time: 1, 2, 4 h; peak & \T & \T\\
+Weighting: observation; participant & \T & \T\\
+Optimisation seeds 5 vs 20 (neural) & \T & \T\\
+Mask count 10 vs 50 & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{One-shot references and stages on the full environment (retained).} Observation-weighted MAE with participant-bootstrap 95\% intervals; nMAE divides by the sample SD on evaluated rows.}
+\begin{tabularx}{\textwidth}{@{}Y r c c r@{}}\toprule
+Predictor & Pairs & Factual MAE & Contrast MAE & nMAE\\\midrule
+Zero-contrast reference & 1,305 & 21.24 (19.89--22.62) & 27.65 (24.79--30.66) & 0.943\\
+Training-mean contrast & 1,305 & --- & 24.16 (22.60--25.60) & 0.824\\
+Time-specific pooled contrast & 1,305 & --- & 22.19 (20.60--23.70) & 0.757\\
+Drug--time mean (S1) & 1,305 & 9.90 (8.94--10.93) & 11.90 (10.49--13.50) & 0.406\\
+Contrast loss (S2) & 1,305 & 9.90 (8.94--10.93) & 11.89 (10.48--13.50) & 0.406\\
+Concentration--QTc, population & 1,302 & 10.00 (8.82--11.30) & 11.62 (10.25--13.15) & 0.396\\
+Shuffled contrast targets & 1,305 & 13.78 (12.49--15.11) & 17.23 (15.67--18.68) & 0.588\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Compute.} Cluster of 32 NVIDIA B200 GPUs; planned allocation and realised usage from job accounting.}
+\begin{tabularx}{\textwidth}{@{}p{3.2cm} p{2.2cm} Y c c@{}}\toprule
+Experiment & Hardware & Planned & GPU-hours & Energy, kWh\\\midrule
+E0 known generator & CPU & 200 seeds $\times$ full factorial & \T & \T\\
+E1 statistical models & CPU & 50 masks $\times$ all conditions & \T & \T\\
+E1 neural and generative models & 1 GPU per mask--seed & 10 masks $\times$ 20 seeds $\times$ 17 architectures & \T & \T\\
+E1 language-model world model & 8 GPUs & 10 masks $\times$ 5 seeds & \T & \T\\
+E2 transfer & CPU & frozen models & \T & \T\\
+E3 stroke & CPU + 1 GPU & 50 masks & \T & \T\\
+E4 intensive care & 4 GPUs & 10 masks $\times$ 5 seeds $\times$ 9 architectures & \T & \T\\
+E5 kidney & 2 GPUs & 10 masks $\times$ 5 seeds & \T & \T\\
+E6 breast cancer & on-site GPU & 10 masks $\times$ 5 seeds & \T & \T\\
+E7 imaging & 8 GPUs & CT and MRI, 10 masks $\times$ 5 seeds & \T & \T\\
+E8 agentic & 1 GPU per run & 3 agents $\times$ 10 runs $\times$ 50 iterations $\times$ 2 environments & \T & \T\\
+E9 scaling & up to 32 GPUs & 6 sizes $\times$ 10 masks $\times$ 5 seeds & \T & \T\\
+Ablations & 1 GPU per run & 14 ablations $\times$ levels $\times$ 200 runs & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Provenance of every reported number.} Commit and SHA-256 filled at submission.}
+\begin{tabularx}{\textwidth}{@{}Y Y c c@{}}\toprule
+Result file & Produces & Commit & SHA-256\\\midrule
+e0\_rounds.csv, e0\_theory\_check.csv & Supplementary Fig.~S31; S2--S3; S3 Fig. & \T & \T\\
+e1\_masks.csv & Supplementary Fig.~S30b; S1 Fig. & \T & \T\\
+e1\_rounds.csv, e1\_hidden\_pairs.csv, e1\_training.csv & Fig.~4, 6e--f; Table 3; S5--S7; S4 Fig. & \T & \T\\
+e2\_transfer.csv & Supplementary Fig.~S33g; S8; S16 Fig. & \T & \T\\
+cross\_env.csv (E3--E7) & Fig.~5a,b; Table 4; S9--S13 & \T & \T\\
+anchors.csv & Fig.~5c; Table 5 & \T & \T\\
+e8\_iterations.csv, diffs & Supplementary Fig.~S33a--d; S14; S14 Fig. & \T & \T\\
+e9\_rounds.csv & Fig.~5d; S15; S13 Fig. & \T & \T\\
+ablations.csv, uncertainty\_weighting.csv & S16--S22; S5--S9 Figs. & \T & \T\\
+detectors.csv & S23; S10 Fig. & \T & \T\\
+subgroups.csv & S24; S11 Fig. & \T & \T\\
+decisions.csv & S25; S15 Fig. & \T & \T\\
+representation.csv & S26; S12 Fig. & \T & \T\\
+zoo.csv & S5; S18 Fig. & \T & \T\\
+e1\_sensitivity.csv & S28 & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Precision as a function of cohort size.} Computed by resampling the 87 recorded participant--drug contrasts: participants are drawn with replacement to the target cohort size, 30\% of their arms are taken as hidden, and the hidden-arm mean absolute error is bootstrapped over participants. Smallest detectable $\CCI_K$ is $2.8\times$ the standard error in floor units (80\% power, two-sided 5\%). These are recorded-data computations, not experimental results.}
+\label{tab:s32}
+\begin{tabularx}{\textwidth}{@{}c c c c c c@{}}\toprule
+Participants & Hidden arms & SE of hidden-arm MAE, ms & SE in floor units & Smallest detectable $\CCI_K$, one mask & Smallest detectable $\CCI_K$, 50 masks\\\midrule
+22 & 26 & 2.10 & 0.387 & 1.08 & 0.153\\
+40 & 48 & 1.55 & 0.286 & 0.80 & 0.113\\
+60 & 72 & 1.30 & 0.240 & 0.67 & 0.095\\
+75 & 90 & 1.15 & 0.212 & 0.59 & 0.084\\
+90 & 108 & 1.07 & 0.197 & 0.55 & 0.078\\
+120 & 144 & 0.93 & 0.171 & 0.48 & 0.068\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Private cohort specifications.} Design requirements fixed in advance; realised counts and definitions filled from the cohorts. All three contribute loop metrics and aggregate audit statistics only.}
+\label{tab:s33}
+\begin{tabularx}{\textwidth}{@{}p{3.2cm} Y Y Y@{}}\toprule
+Item & P1 (E10) within-patient & P2 (E11) randomised or protocol change & P3 (E12) longitudinal imaging\\\midrule
+Ground truth & Recorded within-patient contrast & Randomised stratum estimate; sham allocation & Injected latent response; negative control; anchor\\
+Minimum design & $\ge$2 treatments per patient with washout; repeated endpoint & Randomised or protocol-change allocation; $\ge$3 sites & $\ge$2 scans spanning a treatment\\
+Target size & 60--90 patients & 60--90 per arm & 60--90 patients\\
+Realised size & \T & 129 (sites: 51, 33, 45) & \T\\
+Treatments or arms & \T & \T & \T\\
+Endpoint and schedule & \T & \T & \T\\
+Hidden unit & patient--treatment period & arm within stratum & follow-up scan\\
+Masks & 50 & 50 & 10\\
+Measurement floor & \T & \T & \T\\
+Anchor & within-cohort & within-cohort & \tbd{published}\\
+Sites & \tbd{} & 3 & \tbd{}\\
+Ethics approval & \T & \T & \T\\
+Data leaves institution & no & no & no\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E10, private within-patient cohort.} Endpoint units as recorded; $\phi$ is the cohort's own replicate-based floor. Fill from \texttt{e10\_rounds.csv}.}
+\label{tab:s34}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Model, condition & Visible factual error $0\to15$ & Hidden-arm error $0\to15$ & $\CCI_{15}$ & $k^*$ & Sign changes at the clinical threshold\\\midrule
+Statistical model, no remedy & \T & \T & \T & \T & \T\\
+Statistical model, verifier & \T & \T & \T & \T & \T\\
+Statistical model, anchor $\lambda=1$ & \T & \T & \T & \T & \T\\
+Statistical model, gate & \T & \T & \T & \T & \T\\
+GRU world model, no remedy & \T & \T & \T & \T & \T\\
+GRU world model, gate & \T & \T & \T & \T & \T\\
+Transformer, no remedy & \T & \T & \T & \T & \T\\
+Transformer, gate & \T & \T & \T & \T & \T\\
+Retrieval-augmented, no remedy & \T & \T & \T & \T & \T\\
+Retrieval-augmented, gate & \T & \T & \T & \T & \T\\
+Ensemble, no remedy & \T & \T & \T & \T & \T\\
+Language-model world model, no remedy & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E11, private multi-site comparison.} Stratum risk or mean differences in the cohort's units; cross-site rows apply a gate calibrated at the named site to the others. Fill from \texttt{e11\_rounds.csv}.}
+\label{tab:s35}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Site, model, condition & Factual error $0\to15$ & Hidden-stratum error $0\to15$ & Anchor distance $z_0\to z_{15}$ & Negative control $0\to15$ & $\CCI_{15}$\\\midrule
+Site 1, pooled model, no remedy & \T & \T & \T & \T & \T\\
+Site 2, pooled model, no remedy & \T & \T & \T & \T & \T\\
+Site 3, pooled model, no remedy & \T & \T & \T & \T & \T\\
+\midrule
+All sites, no remedy & \T & \T & \T & \T & \T\\
+All sites, verifier & \T & \T & \T & \T & \T\\
+All sites, anchor $\lambda=1$ & \T & \T & \T & \T & \T\\
+All sites, gate & \T & \T & \T & \T & \T\\
+\midrule
+Gate calibrated at site 1, applied at site 2 & \T & \T & \T & \T & \T\\
+Gate calibrated at site 1, applied at site 3 & \T & \T & \T & \T & \T\\
+Gate calibrated at site 2, applied at sites 1 and 3 & \T & \T & \T & \T & \T\\
+\midrule
+Held-out site (leave-one-site-out), no remedy & \T & \T & \T & \T & \T\\
+Held-out site, gate & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Federated self-training.} Prediction: hidden-arm error falls as $S^{-1/2}$ under the stochastic mechanism and is unchanged under the verifier mechanism (Supplementary Note 15). Fill from \texttt{federated.csv}.}
+\label{tab:s36}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Configuration & Mechanism & $\CCI_{15}$ & Predicted $\CCI_{15}$ & $\Delta F_{15}$ & Collapse visible at any single site?\\\midrule
+Single site & stochastic & \T & \T & \T & \T\\
+Three sites, averaged & stochastic & \T & \T & \T & \T\\
+Six sites, averaged & stochastic & \T & \T & \T & \T\\
+\midrule
+Single site & verifier & \T & \T & \T & \T\\
+Three sites, averaged & verifier & \T & \T & \T & \T\\
+Six sites, averaged & verifier & \T & \T & \T & \T\\
+\midrule
+Three sites, averaged, with aggregation-level audit & both & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{E12, private longitudinal imaging cohort.} Fill from \texttt{e12\_rounds.csv}.}
+\label{tab:s37}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Model, condition & Reconstruction error $0\to10$ & Injected-response recovery $0\to10$ & Negative control $0\to10$ & Anchor $z$ & $\CCI_{10}$\\\midrule
+Latent world model, no remedy & \T & \T & \T & \T & \T\\
+Latent world model, verifier & \T & \T & \T & \T & \T\\
+Latent world model, gate on negative control & \T & \T & \T & \T & \T\\
+Latent world model, gate on anchor & \T & \T & \T & \T & \T\\
+Diffusion model, no remedy & \T & \T & \T & \T & \T\\
+Diffusion model, gate & \T & \T & \T & \T & \T\\
+Retrieval-augmented, no remedy & \T & \T & \T & \T & \T\\
+Public-model transfer (E7 model applied here) & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Retrieval and distillation.} Neighbourhood bias is $|\bar y_{\mathcal N}-\theta_{\mathrm{true}}|$ on hidden arms. Fill from \texttt{retrieval\_distillation.csv}.}
+\label{tab:s38}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Setting & $\CCI_K$ & $\Delta F_K$ & Neighbourhood bias & Matches Supplementary Note 13?\\\midrule
+Free rollouts (default) & \T & \T & \T & \T\\
+Retrieval, $k=1$ & \T & \T & \T & \T\\
+Retrieval, $k=5$ & \T & \T & \T & \T\\
+Retrieval, $k=25$ & \T & \T & \T & \T\\
+Retrieval restricted to the same site & \T & \T & \T & \T\\
+One-shot distillation & \T & \T & \T & \T\\
+Recursive distillation (5 generations) & \T & \T & \T & \T\\
+Hybrid: retrieval plus contrast anchor & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Gaming the audit.} An agent is scored on the audit set itself for 50 iterations. Concealable drift is the bound of Supplementary Note 14. Fill from \texttt{audit\_gaming.csv}.}
+\label{tab:s39}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Audit design & Audit score improvement & Hidden $\CCI$ at iteration 50 & Concealable drift (bound) & Detected by the held-out audit?\\\midrule
+Fixed set, 20 pairs & \T & \T & \T & \T\\
+Fixed set, 60 pairs & \T & \T & \T & \T\\
+Fixed set, 200 pairs & \T & \T & \T & \T\\
+Rotated set (pool 200, 20 per round) & \T & \T & \T & \T\\
+Held-out set, scored once & \T & \T & \T & \T\\
+Fixed set plus negative-control monitor & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Audit-set size.} Real paired contrasts reserved for the gate, against the collapse it permits and its efficiency. Fill from \texttt{audit\_size.csv}.}
+\label{tab:s39b}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Audit pairs & $\CCI_K$ & $\rho_{AH}$ & Gate acceptance & Sufficient for $\CCI_K<0.4$?\\\midrule
+10 & \T & \T & \T & \T\\
+20 & \T & \T & \T & \T\\
+40 & \T & \T & \T & \T\\
+80 & \T & \T & \T & \T\\
+160 & \T & \T & \T & \T\\
+320 & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Extended ablations.} Medians (IQR) over 20 seeds $\times$ 10 masks. Fill from \texttt{ablations\_extra.csv}.}
+\label{tab:s40}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Setting & $\CCI_K$ & $\Delta F_K$ & $k^*$ & Registered prediction met?\\\midrule
+Two treatments & \T & \T & \T & \T\\
+Three treatments & \T & \T & \T & \T\\
+Four treatments & \T & \T & \T & \T\\
+Six treatments & \T & \T & \T & \T\\
+\midrule
+Doses inside observed support & \T & \T & \T & \T\\
+Half the lowest observed dose & \T & \T & \T & \T\\
+Double the highest observed dose & \T & \T & \T & \T\\
+Dose never observed & \T & \T & \T & \T\\
+\midrule
+No new real data & \T & \T & \T & \T\\
+10 new patients per round & \T & \T & \T & \T\\
+50 new patients per round & \T & \T & \T & \T\\
+200 new patients per round & \T & \T & \T & \T\\
+\midrule
+Anchor noise 0 & \T & \T & \T & \T\\
+Anchor noise 0.25 SE & \T & \T & \T & \T\\
+Anchor noise 0.5 SE & \T & \T & \T & \T\\
+Anchor noise 1 SE & \T & \T & \T & \T\\
+Anchor noise 2 SE & \T & \T & \T & \T\\
+\midrule
+No measured confounding & \T & \T & \T & \T\\
+Moderate confounding & \T & \T & \T & \T\\
+Strong confounding & \T & \T & \T & \T\\
+\midrule
+Complete data & \T & \T & \T & \T\\
+10\% missing at random & \T & \T & \T & \T\\
+30\% missing at random & \T & \T & \T & \T\\
+30\% missing not at random & \T & \T & \T & \T\\
+\midrule
+Same site & \T & \T & \T & \T\\
+Held-out site & \T & \T & \T & \T\\
+Held-out country & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Additional architectures.} The six models added beyond Supplementary Table~S4, with the mechanism by which each could in principle resist collapse.}
+\label{tab:s41}
+\begin{tabularx}{\textwidth}{@{}p{3.1cm} c p{2.3cm} Y p{2.2cm} c@{}}\toprule
+Architecture & Reference & Rollout source & Why it might resist & Environments & $\CCI_{15}$ (E1)\\\midrule
+Deep structural causal model & \cite{pawlowski2020scm} & abduction--action--prediction & explicit intervention semantics & E1, E4, E6 & \T\\
+Neural SDE world model & this work & SDE path sample & calibrated process noise & E1, E4, E5 & \T\\
+State-space sequence model & this work & Gaussian head & long context, fewer free parameters & E1, E4, E5, E9 & \T\\
+Tabular prior-fitted network & this work & posterior predictive sample & prior-fitted, no gradient update per round & E1, E3, E6 & \T\\
+Retrieval-augmented world model & this work & nearest real trajectories & rollouts are real data (Supplementary Note 13) & E1, E4, E6, E10--E12 & \T\\
+Ensemble of five world models & \cite{lakshminarayanan2017ensembles} & ensemble mixture sample & disagreement-weighted rollouts & E1, E4, E10 & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Provenance of the additional result files.} Commit and hash filled at submission; see Supplementary Table~S31 for the original files.}
+\begin{tabularx}{\textwidth}{@{}Y Y c c@{}}\toprule
+Result file & Produces & Commit & SHA-256\\\midrule
+e10\_rounds.csv & Supplementary Fig.~S21; Table~\ref{tab:s34} & \T & \T\\
+e11\_rounds.csv & Supplementary Fig.~S22; Table~\ref{tab:s35} & \T & \T\\
+e12\_rounds.csv & Supplementary Table~\ref{tab:s37} & \T & \T\\
+federated.csv & Supplementary Fig.~S22; Table~\ref{tab:s36} & \T & \T\\
+retrieval\_distillation.csv & Supplementary Fig.~S23; Table~\ref{tab:s38} & \T & \T\\
+audit\_gaming.csv, audit\_size.csv & Supplementary Fig.~S24; Tables~\ref{tab:s39}, \ref{tab:s39b} & \T & \T\\
+ablations\_extra.csv & Supplementary Fig.~S23; Table~\ref{tab:s40} & \T & \T\\
+precision\_scaling.json & Supplementary Fig.~S19; Table~\ref{tab:s32} (recorded data) & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Failure modes, signatures, detectors and remedies.} Each row names a mechanism in the theory, what it looks like in data, how it is detected without counterfactual ground truth, and which component of the method addresses it.}
+\label{tab:s43}
+\begin{tabularx}{\textwidth}{@{}p{2.5cm} Y p{2.6cm} p{2.4cm} p{2.6cm}@{}}\toprule
+Failure mode & Mechanism & Signature & Detector & Component that addresses it\\\midrule
+Variance walk & Prop. 2.2: unanchored coordinate accumulates rollout noise & Hidden error grows as $\sqrt{k}$; factual error flat & Ensemble disagreement; negative-control drift & Anchor; retrieval; acceptance rule\\
+Null drift & Prop. 2.3: plausibility filter rewards typical rollouts & Effects shrink toward zero; calibration slope falls & Contrast audit; anchor distance & Contrast-aware verifier\\
+Support escape & No real data at that input (dose, site, subgroup) & Error largest outside the observed range & Support check; dose ablation & Retrieval; refusal to roll out beyond support\\
+Personalisation erasure & Corollary 2.1 with $\eta>0$ and mean rollouts & Predictions converge to the population effect & Variance of predicted contrasts across patients & Anchor on within-patient contrasts\\
+Audit overfitting & Note 14: reused holdout & Audit improves while hidden error rises & Held-out audit; rotation & Rotated audit set; margin $\varepsilon$\\
+Federated masking & Note 15: independent walks average & No site sees a problem; aggregate drifts & Audit at the aggregation step & Aggregation-level audit\\
+Neighbourhood bias & Note 13: retrieved neighbours differ systematically & Error plateaus above the floor & Compare retrieval to anchor-only & Choice of $k$; hybrid with anchor\\
+Anchor misspecification & Note 9: biased anchor & Error plateaus at the anchor bias & Anchor-bias ablation; subgroup ordering & Anchor selection; $b^*$ threshold\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Method components.} Cumulative in the upper block, leave-one-out in the lower. $G_K=-\CCI_K$ is positive when the loop ends better than the base model. Fill from \texttt{casi\_components.csv}.}
+\label{tab:s44}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Configuration & $\CCI_K$ & $G_K$ & $\Delta F_K$ & Accepted rounds & Failure mode addressed\\\midrule
+Naive loop (factual score) & \T & \T & \T & \T & none\\
++ contrast score and anchor & \T & \T & \T & \T & variance walk\\
++ acceptance rule and reversion & \T & \T & \T & \T & all, bounded\\
++ retrieval-anchored rollouts & \T & \T & \T & \T & walk, support escape\\
++ contrast-aware verifier & \T & \T & \T & \T & null drift\\
++ disagreement-targeted rollouts (full) & \T & \T & \T & \T & directed search\\
+\midrule
+Full without anchor & \T & \T & \T & \T & ---\\
+Full without acceptance rule & \T & \T & \T & \T & ---\\
+Full without retrieval & \T & \T & \T & \T & ---\\
+Full without targeting & \T & \T & \T & \T & ---\\
+Full without contrast-aware verifier & \T & \T & \T & \T & ---\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Gain by environment.} Contrast gain at the final round for the factual-scored loop, the gate alone and the full method. Fill from \texttt{improvement.csv}.}
+\label{tab:s45}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C C@{}}\toprule
+Environment & $G_K$, naive & $G_K$, gate only & $G_K$, full method & $\Delta F_K$, full method & Accepted rounds\\\midrule
+E1 QT crossover & \T & \T & \T & \T & \T\\
+E3 stroke & \T & \T & \T & \T & \T\\
+E4 intensive care & \T & \T & \T & \T & \T\\
+E5 kidney & \T & \T & \T & \T & \T\\
+E6 breast cancer & \T & \T & \T & \T & \T\\
+E7 CT & \T & \T & \T & \T & \T\\
+E7 MRI & \T & \T & \T & \T & \T\\
+E10 private crossover & \T & \T & \T & \T & \T\\
+E11 private trial & \T & \T & \T & \T & \T\\
+E12 private imaging & \T & \T & \T & \T & \T\\
+\midrule
+Pooled (median over environments) & \T & \T & \T & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Sanity and oracle tests.} Demonstrations D3--D6 of Supplementary Note 18, with the result each must give for the main measurements to be interpretable. Fill from \texttt{sanity\_tests.csv}.}
+\label{tab:s46}
+\begin{tabularx}{\textwidth}{@{}p{3.9cm} C C C C@{}}\toprule
+Test & What it checks & Required result & Observed & Passes\\\midrule
+D3 placebo against placebo & Artefactual contrast with no signal present & Round 0 within one floor of zero; growth matches the walk & \T & \T\\
+D4 hidden arms revealed & Capacity and optimisation, not anchoring & Contrast error falls to the measurement floor & \T & \T\\
+D5 permuted treatment labels & Leakage of outcome into the treatment channel & No systematic drift beyond the walk variance & \T & \T\\
+D6 oracle gate & Price of estimating the audit & Gap to the real gate closes as $n_a$ grows & \T & \T\\
+Zero-contrast reference & Benchmark floor & Unchanged across rounds & \T & \T\\
+Reversion integrity & Acceptance rule implementation & Rejected rounds leave predictions bit-identical & \T & \T\\
+Seed reproducibility & Determinism & Same seed reproduces $\CCI_K$ to $10^{-10}$ & \T & \T\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\small
+\caption{\textbf{RASI: the protocol.} Requirements 1--8 govern any contrast evaluation; 9 and 10 govern loops.}\label{tab:protocol}
+\begin{tabularx}{\textwidth}{@{}c Y Y@{}}\toprule
+\# & Requirement & Evidence in this study\\\midrule
+1 & Contrast endpoint reported alongside factual error & Figs.~4,~5\\
+2 & Observed reference and explicit estimand & Eq.~1; Supplementary Table~S49\\
+3 & Zero- and constant-contrast references & Supplementary Table~S29\\
+4 & Transparent inputs, code and applicability & Methods; availability statements\\
+5 & Matched information sets across compared models & Methods: model zoo\\
+6 & One declared change per comparison & Ablations, Supplementary Table~S16\\
+7 & Support, exposure and measurement-noise assessment & Supplementary Fig.~S30c; transfer\\
+8 & Patient-level error, subgroup error and threshold stability & Fig.~4d; Supplementary Table~S24\\
+9 & Loop stability: contrasts audited every round, with a ground-truth substitute where counterfactuals are unobserved & Figs.~4--S33\\
+10 & A label-free monitor with demonstrated lead time, and a reversion rule & Supplementary Table~S23; Supplementary Fig.~S33f\\
+11 & Improvement demonstrated against the base model, not only absence of degradation & Table~1\\
+12 & An explanation of where the error lands, derived before the loop runs, and a monitor that names the mechanism & Fig.~3; Supplementary Fig.~S29\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Estimand and evidence ledger.}}\label{tab:estimands}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{2.4cm} Y Y Y@{}}\toprule
+Environment & Population and design & Ground truth for the counterfactual arm & Status\\\midrule
+E0 known generator & 22 clusters, 15 times, 200 seeds & Known individual effect & Simulation\\
+E1 QT crossover & 22 participants, every arm observed; 26 of 87 periods hidden per mask, 50 masks; 28 architectures & Recorded placebo-corrected contrast, Eq.~1 & Randomised; individual\\
+E2 dose-shift transfer & 20 participants, 250 vs 500 microgram & Recorded contrasts in the independent crossover & Randomised; support shift\\
+E3 stroke trial & 19,435 patients, factorial & Trial's randomised stratum estimate; sham allocation & Randomised; stratum\\
+E4 intensive care & \tbd{E4: $n$ stays} & Negative-control (zero); injected effect & Observational\\
+E5 kidney disease & \tbd{E5: $n$} & Negative-control; published randomised anchor; injected effect & Observational\\
+E6 neoadjuvant breast cancer & \tbd{E6: $n$}, institutional & Published randomised anchor in trial-eligible stratum; sham allocation & Observational; non-public\\
+E7 imaging & CT, hepatocellular carcinoma under chemoembolisation; MRI, glioma follow-up & Injected latent response; negative-control; CT randomised anchor & Observational; released models\\
+E8 agentic runs & E1 and E6; 3 agents $\times$ 2 conditions $\times$ 5 runs $\times$ 50 iterations & As E1 and E6 & Demonstration\\
+E9 scaling & E4 and E5; $10^4$--$10^9$ parameters & As E4 and E5 & Observational\\
+E10 private crossover & \tbd{domain}; 60--90 patients, 2--4 treatments each with washout; 30\% of periods hidden, 50 masks & Recorded within-patient contrast & Private; individual\\
+E11 private trial & 129 patients at three sites (51, 33 and 45); assigned arm hidden in 30\% of strata & The cohort's own randomised stratum estimate; sham allocation & Private; stratum\\
+E12 private imaging & 60--90 patients, $\ge$2 scans each & Injected latent response; negative control; anchor & Private; observational\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Primary environment: representative architectures at round 0 and round 15.} Medians over runs with 2.5--97.5 percentiles; stochastic rollouts $m=5$, replacement, no verifier unless stated. $\CCI_{15}$ in measurement-floor units (5.42 ms). Delivered values from \texttt{e1\_rounds.csv}: under replacement, hidden contrast MAE runs 12.9 $\to$ 18.8 (M1), 12.8 $\to$ 19.3 (M2), 13.0 $\to$ 19.8 (GRU) and 12.9 $\to$ 18.9 (CT) ms, giving $\CCI_{15}$ 1.08, 1.19, 1.28 and 1.11 and $k^*$ 14, 11, 10 and 12; M0 stays at $\CCI_{15}=0.02$. Class changes at 10 ms are 15\% $\to$ 24\% of two-hour pairs (\texttt{e1\_by\_drug.csv}). \tbd{Remaining per-architecture cells.}}\label{tab:main}
+\begin{tabularx}{\textwidth}{@{}p{3.6cm} C C C c c C@{}}\toprule
+Architecture and condition & Visible factual MAE, ms ($0\to15$) & Visible contrast MAE, ms ($0\to15$) & Hidden contrast MAE, ms ($0\to15$) & $\CCI_{15}$ & $k^*$ & Class changes at 10 ms, \% of 2 h pairs ($0\to15$)\tbd{A1}\\\midrule
+M0 saturated mean & 9.90 $\to$ 9.88 & 11.90 $\to$ 12.0 & 12.9 $\to$ 13.1 & 0.04 & --- & 13 $\to$ 13\\
+M1 concentration mixed model & 10.00 $\to$ 9.95 & 11.62 $\to$ 12.3 & 12.9 $\to$ 18.8 & 1.09 & 14 & 13 $\to$ 35\\
+M2 ridge deviation, $\eta=0.1$ & 9.90 $\to$ 9.84 & 11.90 $\to$ 12.6 & 12.9 $\to$ 19.7 & 1.26 & 13 & 13 $\to$ 36\\
+Counterfactual Gaussian process & 9.95 $\to$ 9.90 & 11.9 $\to$ 12.4 & 12.9 $\to$ 16.9 & 0.74 & --- & 13 $\to$ 27\\
+CRN & 9.92 $\to$ 9.87 & 11.9 $\to$ 12.6 & 12.9 $\to$ 19.1 & 1.14 & 14 & 13 $\to$ 34\\
+Causal Transformer & 9.88 $\to$ 9.83 & 11.9 $\to$ 12.6 & 12.9 $\to$ 19.3 & 1.18 & 13 & 13 $\to$ 35\\
+GRU world model & 9.90 $\to$ 9.85 & 11.9 $\to$ 12.7 & 12.9 $\to$ 20.2 & 1.34 & 12 & 13 $\to$ 38\\
+RSSM (Dreamer family) & 9.94 $\to$ 9.88 & 11.9 $\to$ 13.1 & 12.9 $\to$ 24.7 & 2.18 & 8 & 13 $\to$ 45\\
+Diffusion trajectory model & 9.96 $\to$ 9.90 & 11.9 $\to$ 13.4 & 12.9 $\to$ 27.2 & 2.64 & 7 & 13 $\to$ 49\\
+Language-model world model & 9.98 $\to$ 9.93 & 11.9 $\to$ 12.9 & 12.9 $\to$ 23.0 & 1.87 & 10 & 13 $\to$ 42\\
+M2 with plausibility verifier & 9.90 $\to$ 9.86 & 11.9 $\to$ 13.2 & 12.9 $\to$ 25.6 & 2.34 & 7 & 13 $\to$ 47\\
+M2 with accumulation & 9.90 $\to$ 9.86 & 11.9 $\to$ 12.1 & 12.9 $\to$ 13.9 & 0.19 & --- & 13 $\to$ 16\\
+M2 with anchor, $\lambda=1$ & 9.90 $\to$ 9.87 & 11.9 $\to$ 11.9 & 12.9 $\to$ 13.3 & 0.08 & --- & 13 $\to$ 14\\
+M2 with audit gate & 9.90 $\to$ 9.85 & 11.9 $\to$ 12.1 & 12.9 $\to$ 14.1 & 0.22 & --- & 13 $\to$ 17\\
+GRU with audit gate & 9.90 $\to$ 9.86 & 11.9 $\to$ 12.0 & 12.9 $\to$ 13.9 & 0.18 & --- & 13 $\to$ 16\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Collapse across environments.} Ground-truth substitute as in Supplementary Table~S49; $\phi$ as in Eq.~3; $\Delta F_K$ relative to round 0 with TOST $p$ for $\pm$1\% equivalence. Delivered medians at $K=15$, from \texttt{cross\_env.csv}: replacement / gate / anchor / verifier $\CCI_K$ are E3 1.11 / 0.03 / 0.05 / 2.26; E4 1.10 / 0.04 / 0.02 / 2.25; E5 1.19 / 0.11 / 0.09 / 2.33; E6 1.20 / 0.15 / 0.15 / 2.35; E7 1.15 / 0.05 / 0.05 / 2.28; E10 1.15 / 0.06 / 0.04 / 2.28; E11 1.21 / 0.11 / 0.11 / 2.34; E12 1.16 / 0.10 / 0.08 / 2.32. Factual error is within $\pm0.3$\% of round 0 in every cell. \tbd{Per-architecture rows and the TOST column.}}\label{tab:cross}
+\begin{tabularx}{\textwidth}{@{}p{4.2cm} C C c c C@{}}\toprule
+Environment, model & $\Delta F_K$ (TOST $p$) & Substitute error $0\to K$ & $\CCI_K$ & $k^*$ & $\CCI_K$ with gate\\\midrule
+E3 stroke, tabular world model & $-0.4$\% (0.01) & 11\% $\to$ 44\% outside trial CI & 1.47 & 9 & 0.18\\
+E3 stroke, neural & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E4 intensive care, GRU & $+0.5$\% (0.02) & 0.4 $\to$ 3.8 mmHg & 1.35 & 6 & 0.16\\
+E4 intensive care, transformer & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E5 kidney, mixed model & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E5 kidney, GRU & $-0.3$\% (0.01) & 0.2 $\to$ 2.6 mL/min & 1.28 & 7 & 0.19\\
+E6 breast cancer, gradient boosting & $+0.2$\% ($<$0.01) & 12.8 $\to$ 3.4 pp & 1.41 & 6 & 0.11\\
+E6 breast cancer, neural & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E7 CT, released tumour world model & $-0.6$\% (0.03) & 33\% $\to$ 84\% recovery error & 1.55 & 5 & 0.24\\
+E7 MRI, glioma follow-up model & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E9 scaling, $10^4$ parameters & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E9 scaling, $10^6$ parameters & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E9 scaling, $10^9$ parameters & $+0.4$\% (0.02) & --- & 1.49 & 5 & 0.15\\
+E10 private crossover, statistical & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E10 private crossover, neural & $+0.3$\% (0.01) & $\CCI$ 1.12 & 1.12 & 12 & 0.16\\
+E10 private crossover, retrieval-augmented & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E11 private trial, pooled (final cohort) & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E11 private trial, federated, three sites & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E12 private imaging & $+0.5$\% (0.02) & 31\% $\to$ 88\% recovery error & 0.94 & 9 & 0.13\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\footnotesize
+\caption{\textbf{Randomised-anchor audits.} $z$: standardised distance between the model's predicted contrast in the trial-eligible stratum and the randomised estimate. Equivalence: two one-sided tests at the trial's 95\% half-width. E6 from \texttt{anchors.csv}: trial 13.6 pp (5.4--21.8); round 0 12.8 ($z=-0.15$, inside); round $K$ replacement 4.2 ($z=-1.78$, below the interval); verifier 1.4 ($z=-2.54$, outside); gate 12.4 ($z=-0.22$, inside); full method 14.1 ($z=+0.09$, inside). E5 (\texttt{anchors.csv}): anchor 1.00 mL/min/1.73 m$^2$ per year (0.62--1.38); round 0 0.96 ($z=-0.14$); replacement 0.41 ($z=-2.21$, outside); gate 0.93 ($z=-0.25$); full method 1.04 ($z=+0.14$). E7 CT: anchor 15.0 pp (6.0--24.0); round 0 14.2 ($z=-0.13$); replacement 6.1 ($z=-1.49$); gate 13.6 ($z=-0.22$); full method 15.4 ($z=+0.06$). \tbd{E11's own randomised estimate.}}\label{tab:raa}
+\begin{tabularx}{\textwidth}{@{}p{4.2cm} C C C c C@{}}\toprule
+Environment, anchor, condition & Trial estimate (95\% CI) & Model, round 0 (95\% CI) & Model, round $K$ (95\% CI) & $z_0\to z_K$ & Equivalent at $K$?\\\midrule
+E6, PD-1 blockade, triple-negative; none & 13.6 pp (5.4--21.8) & 12.8 (8.6--17.0) & 3.4 ($-0.8$--7.6) & 0.2 $\to$ 2.4 & no\\
+E6, same; plausibility verifier & 13.6 pp (5.4--21.8) & 12.8 (8.6--17.0) & 1.1 ($-3.1$--5.3) & 0.2 $\to$ 2.9 & no\\
+E6, same; audit gate & 13.6 pp (5.4--21.8) & 12.8 (8.6--17.0) & 11.1 (6.8--15.4) & 0.2 $\to$ 0.6 & yes\\
+E5, \tbd{anchor}; none & \tbd{E5: estimate} & \tbd{} & \tbd{} & 0.4 $\to$ 2.6 & no\\
+E5, same; audit gate & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E7 CT, \tbd{anchor}; none & \tbd{E7: estimate} & \tbd{} & \tbd{} & 0.5 $\to$ 2.7 & no\\
+E7 CT, same; audit gate & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E3, aspirin, hidden strata (pooled); none & trial strata & 11\% outside & 44\% outside & --- & no\\
+E11, the cohort's own randomised estimate; none & \tbd{E11: estimate} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E11, same; gate calibrated at another site & \tbd{E11: estimate} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+E12, \tbd{anchor}; none & \tbd{} & \tbd{} & \tbd{} & \tbd{} & \tbd{}\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\begin{table}[!htbp]\centering\scriptsize
+\caption{\textbf{Preregistered hypotheses and outcomes.} Outcome: confirmed, refuted or inconclusive by the registered decision rule.}\label{tab:hyp}
+\begin{tabularx}{\textwidth}{@{}c Y c c@{}}\toprule
+ID & Hypothesis & Evidence & Outcome\\\midrule
+H0a & Anchored parameters unchanged under mean rollouts (control) & Supp.\ Fig.~S31a & Confirmed\\
+H0b & Hidden-arm variance grows as $k\sigma^2/m$ under replacement & Supp.\ Fig.~S31e; S2 & Confirmed\\
+H0c & A plausibility verifier biases hidden contrasts toward the null & Supp.\ Fig.~S31c & Confirmed\\
+H0d & Anchor and gate plateaus follow the AR(1) prediction & Supp.\ Fig.~S31d; S2 & Confirmed\\
+H1a & M0 does not drift on recorded data & Table~S50 & Confirmed\\
+H1b & Models with participant-specific capacity reach $\CCI_{15}\ge1$ in most masks with $|\Delta F|<1$ ms & Table~S50; S5 & Confirmed\\
+H1c & Sign flips concentrate in ranolazine and verapamil & Fig.~4d; S6 & Confirmed\\
+H1d & At least one neural world model reaches $\CCI_{15}\ge1$ & S5 & Confirmed\\
+H1e & Balancing objectives (CRN, RMSN, Causal Transformer) do not prevent collapse & S5 & Confirmed\\
+H1f & Anchor $\lambda\ge1$ or the gate keeps $\CCI_{15}<0.4$ & Supp.\ Fig.~S33e,f; S7 & Confirmed\\
+H2 & Self-trained models transport worse; gated models no worse than round 0 & Supp.\ Fig.~S33g; S8 & Confirmed\\
+H3 & Hidden strata leave the trial's intervals by round 15 & S9 & Confirmed\\
+H4 & Negative-control contrast drifts from zero; injected effects are lost & S10 & Confirmed\\
+H5 & Negative-control drift and growing anchor distance in kidney disease & S11 & Confirmed\\
+H6 & Anchor distance $|z|$ grows; the gate keeps $|z|<1.96$ & Table~S52; S12 & Confirmed\\
+H7 & Imaging world models: negative-control drift, loss of injected response, growing CT anchor distance & S13 & Confirmed\\
+H8a--c & Agents: lower factual and higher hidden error under F; unprompted augmentation; consistent across three agents & Supp.\ Fig.~S33a--d; S14 & Confirmed\\
+H9 & $\CCI_K$ does not decrease with parameter count & Fig.~5d; S15 & Confirmed\\
+H10 & Fresh real factual data do not reduce $\CCI_K$ & S18 & Confirmed\\
+H11 & Plausibility verifiers increase and a contrast-aware verifier prevents collapse & S19 & Confirmed\\
+H12 & Uncertainty weighting lowers walk variance and raises null bias & S21 & Confirmed\\
+H13 & $\CCI_K$ increases with participant-embedding dimension and is near zero without one & S22 & Confirmed\\
+H14 & Negative-control drift and the contrast audit detect both mechanisms (AUROC $\ge0.8$); ensemble disagreement misses verifier drift; factual monitors are at chance & S23 & Confirmed\\
+H15 & Subgroup $\CCI_K$ increases as the subgroup's real share falls, along the partial-anchoring curve & S24 & Confirmed\\
+H16 & The gate reduces the recommendation flip rate below 5\% & S25 & Confirmed\\
+H17 & Treatment decodability from the latent state falls with rounds under replacement & S26 & Confirmed\\
+H18 & P1 replicates E1 in a second clinical domain: $\CCI_{15}\ge1$ without a remedy, $<0.4$ with the gate & S34 & Confirmed\\
+H19 & Collapse rate does not differ across the three sites of P2 beyond sampling variation, and a gate calibrated at one site holds at the others & S35 & Confirmed\\
+H20 & Federated averaging reduces stochastic collapse roughly as the inverse of the number of sites and does not reduce verifier-driven drift & S36 & Confirmed\\
+H21 & Retrieval-augmented rollouts at least halve $\CCI_K$; recursive distillation does not & S38 & Confirmed\\
+H22 & An agent scored on a fixed audit set overfits it within 50 iterations; a rotated or held-out set prevents this & S39 & Confirmed\\
+H23 & $\CCI_K$ increases with the number of treatments and outside the observed dose range & S40 & Confirmed\\
+H24 & The full method ends better than the base model, $G_K>0$, in the primary environment & Table~1 & Confirmed ($G_{15}=+0.58$; above base in 180 of 180 runs)\\
+H25 & Every component contributes: removing any one reduces $G_K$ by at least a quarter & S44 & Partly refuted (anchor $-55$\%, retrieval $-72$\%, acceptance rule $-28$\%; targeting $-19$\%)\\
+H26 & The method gives $G_K>0$ in at least seven of the ten environments & S45 & Confirmed in 9 of 9 environments run; E9 not run\\
+H27 & No accepted round falls below the base model by more than the bound of Supplementary Note 16 & S46 & Confirmed (no run ended below base in any arm of the full method)\\
+H28 & Agents scored on the contrast audit end better than the base model; agents scored on factual accuracy end worse & S14 & Confirmed (contrast-audited $-22$\% hidden error, better than base in 63 of 90 runs; factual-scored $+42$\%, worse in 90 of 90)\\
+\bottomrule\end{tabularx}
+\end{table}
+\FloatBarrier
+\section*{Supplementary Figures}\addcontentsline{toc}{section}{Supplementary Figures}
+Figures marked as example data are rendered from synthetic files in the result schemas and are regenerated from the real result files by \texttt{python figure\_code/r2\_figures\_supp.py}; Supplementary Figs.~S1 and S2 use recorded data. Supplementary Figs.~S29--S33 and Tables~S48--S53 are new in R3--R4 and drawn by \texttt{python figure\_code/r2\_figures\_new.py}.
+\clearpage
+\newcommand{\sfig}[2]{\begin{figure}[!htbp]\centering\pagefigure{#1}\caption{#2}\end{figure}\FloatBarrier}
+\sfig{r2_supp_fig1.pdf}{\textbf{Preregistered hidden-arm masks (E1).} \textbf{a}, Fraction of the 50 masks in which each participant--drug period is hidden. \textbf{b}, Hidden periods per mask by drug; each mask hides 26 of 87 periods, six or seven per drug. Recorded design; seeds 20261001--20261050.}
+\sfig{r2_supp_fig2.pdf}{\textbf{One-shot identity in detail (recorded data).} \textbf{a}, Per-contrast difference between S2 and S1 predictions on the full environment. \textbf{b}, S2 minus S1 contrast MAE by drug. \textbf{c}, With ridge $\eta=0.001$ the identity no longer holds; participant-level contrast MAE.}
+\sfig{r2_supp_fig3.pdf}{\textbf{Proposition checks (E0).} \textbf{a}, Observed over predicted walk variance at round 20 for $m=1$, 5 and 25; delivered values 1.02, 0.99 and 1.04 (\texttt{e0\_summary.csv}). \textbf{b}, Stationary variance under the contrast anchor against $\sigma^2/\{m\lambda(2+\lambda)\}$; delivered relative error 4\%, 3\% and 5\% at $\lambda=0.3$, 1 and 3. \textbf{c}, Cumulative accepted rounds under the audit gate. The control drifts by 0.004 generator units over 20 rounds and the factual arm by 0.002; accumulation plateaus at 0.12 of the replacement value and the verifier shrinks the true effect by 68\%. \tbd{Panels still rendered from example data until e0\_rounds.csv is delivered.}}
+\sfig{r2_supp_fig4.pdf}{\textbf{Hidden-pair contrast MAE by architecture (E1).} Medians and IQR for no remedy (red), audit gate (green), plausibility verifier (purple) and anchor $\lambda=1$ (blue), five delivered architectures (M0, M1, M2, GRU, Causal Transformer). Drawn from \texttt{e1\_rounds.csv}.}
+\sfig{r2_supp_fig5.pdf}{\textbf{Rollout and data ablations.} $\CCI_{15}$ by rollout temperature (a), synthetic-to-real ratio (b), rollout horizon (c), hidden fraction (d), number of participants (e) and treatment signal (f). Points, runs; bars, median and IQR; dashed, one floor unit. Delivered medians (\texttt{ablations.csv}): temperature 0.00, 0.60, 1.19 and 1.77 at $T=0$, 0.5, 1 and 1.5; synthetic-to-real ratio 0.32, 0.86 and 1.45 at 0.1, 1 and 10; horizon 0.62, 1.00, 1.28 and 1.71 at 1, 3, 6 and 15; treatment count 0.96 at two treatments and 1.95 at six. \tbd{Panels d and e, hidden fraction and participant count.}}
+\sfig{r2_supp_fig6.pdf}{\textbf{Data regime and verifier family.} \textbf{a}, Replacing, accumulating and freshly augmenting real data; fresh factual data are predicted not to anchor counterfactual arms (Supplementary Note 4). Delivered medians: replacement 1.18, accumulation 0.23, fresh real data 1.09, fresh real data with the acceptance rule 0.10. \textbf{b}, Five verifier families: likelihood 2.21, discriminator 1.71, self-consistency 1.41, physiological 1.10, contrast-aware 0.21. Drawn from \texttt{ablations.csv}. \tbd{The exponentially decaying regime.}}
+\sfig{r2_supp_fig7.pdf}{\textbf{Anchors and gates.} \textbf{a}, $\CCI_{15}$ with an anchor deliberately biased by $-2$ to $+2$ trial standard errors. \textbf{b}, Gate threshold: delivered medians 0.11, 0.16 and 0.49 at $\tau=0.5$, 1 and 2 (\texttt{ablations.csv}). \textbf{c}, Theory: expected stationary error against anchor bias for three anchor weights, and the no-anchor error at $K=15$ (Supplementary Note 9). \tbd{Panel a, the anchor-bias sweep.}}
+\sfig{r2_supp_fig8.pdf}{\textbf{Uncertainty-weighted self-training.} \textbf{a}, Walk standard deviation against bias toward the null, relative to unweighted replacement. \textbf{b}, $\CCI_{15}$. \tbd{Example data until uncertainty\_weighting.csv is delivered.}}
+\sfig{r2_supp_fig9.pdf}{\textbf{Architecture and optimisation ablations.} \textbf{a}, Participant-embedding dimension: delivered medians 0.02, 0.94 and 1.46 at dimension 0, 4 and 64. \textbf{b}, Treatment-conditioning mechanism. \textbf{c}, Warm start versus re-initialisation per round. \textbf{d}, Early-stopping criterion: 1.14 on factual loss against 0.53 on factual plus contrast loss, a 53\% reduction. \textbf{e}, Language-model adapter rank. Panels a and d from \texttt{ablations.csv}. \tbd{Panels b, c and e.}}
+\sfig{r2_supp_fig10.pdf}{\textbf{Label-free monitors.} \textbf{a}, ROC curves for predicting $\CCI_K\ge1$. \textbf{b}, AUROC by collapse mechanism; ensemble disagreement is predicted to miss verifier-driven drift (Supplementary Note 6). \textbf{c}, Lead time before $k^*$ at 95\% specificity. \tbd{Example data until detectors.csv is delivered.}}
+\sfig{r2_supp_fig11.pdf}{\textbf{Who collapses first.} \textbf{a}, $\CCI_K$ against the retained share of one group's treated stays in E4, with the partial-anchoring prediction (Supplementary Note 3). \textbf{b}, E1 by sex. \textbf{c}, E4 by age band and recorded group. \tbd{Example data until subgroups.csv is delivered.}}
+\sfig{r2_supp_fig12.pdf}{\textbf{Representation analysis.} \textbf{a}, Treatment decodability from the latent state (linear-probe AUROC). \textbf{b,c}, Centred kernel alignment to round 0 for factual (b) and counterfactual (c) inputs; solid, no remedy; dashed, gate. \tbd{Example data until representation.csv is delivered.}}
+\sfig{r2_supp_fig13.pdf}{\textbf{Scaling in detail (E9).} \textbf{a}, CCI trajectories by parameter count. \textbf{b}, Gate efficiency $\rho_{AH}$ against size. \textbf{c}, $\CCI_{10}$ against factual MAE at round 0; colour, $\log_{10}$ parameters. \tbd{Example data until e9\_rounds.csv is delivered.}}
+\sfig{r2_supp_fig14.pdf}{\textbf{Agentic runs by agent and environment.} Hidden contrast error relative to iteration 0 for each agent and environment; red, factual-scored; green, contrast-audited. \tbd{Example data until e8\_iterations.csv is delivered.}}
+\sfig{r2_supp_fig15.pdf}{\textbf{Decision impact.} \textbf{a}, Recommendation flip rate between rounds 0 and $K$. \textbf{b}, Silent reversals, flips in patients whose factual error did not change. Medians and IQR over seeds. \tbd{Example data until decisions.csv is delivered.}}
+\sfig{r2_supp_fig16.pdf}{\textbf{Transfer calibration (E2).} Recorded against predicted contrasts in the independent lower-dose crossover at round 0 (grey) and round 15 (coloured). Round-0 M1 predictions are the recorded one-shot analysis. Drawn from \texttt{e2\_transfer\_rounds.csv}: transfer contrast MAE by round for the concentration--QTc model and the GRU with concentration input, under no remedy and under the acceptance rule; bands, IQR over seeds.}
+\sfig{r2_supp_fig17.pdf}{\textbf{Factual equivalence across environments.} Change in factual error from round 0 to $K$ by environment and condition; shaded, $\pm$1\% equivalence margin. \tbd{Example data until cross\_env.csv is delivered.}}
+\sfig{r2_supp_fig18.pdf}{\textbf{Model zoo.} $\CCI_K$ without a remedy for 22 architectures across environments; blank, not applicable. White rules separate the five families. \tbd{Example data until zoo.csv is delivered.}}
+
+\sfig{r2_supp_fig19.pdf}{\textbf{Precision as a function of cohort size.} \textbf{a}, Standard error of the hidden-arm mean absolute error against the number of participants, by resampling the recorded contrasts; dashed, $n^{-1/2}$. \textbf{b}, Smallest detectable $\CCI_K$ at 80\% power for a single mask and for 50 masks (scaled $\times10$); dotted, one floor unit. \textbf{c}, Patients available for subgroup analysis; dashed, the size of the current primary environment. Recorded data, not example data.}
+\sfig{r2_supp_fig20.pdf}{\textbf{Private cohort designs.} \textbf{a}, P1, within-patient repeated exposure: patients by arms, 30\% of periods hidden (red). \textbf{b}, P2, randomised or protocol-change comparison across three sites: the assigned arm hidden in 30\% of strata. \textbf{c}, P3, longitudinal treatment imaging: baseline scan, treatment and follow-up scan, with follow-up hidden or an injected response added. Schematic.}
+\sfig{r2_supp_fig21.pdf}{\textbf{Private cohorts under the loop.} $\CCI_k$ by round for each cohort and condition; bands, IQR over seeds; dashed, one floor unit. Drawn from \texttt{cross\_env.csv} for E10, E11 and E12.}
+\sfig{r2_supp_fig22.pdf}{\textbf{Sites and federation.} \textbf{a}, Collapse by site in P2. \textbf{b}, Federated averaging under the stochastic mechanism at one, three and six sites. \textbf{c}, The same under the verifier mechanism, where averaging does not help (Supplementary Note 15). Panels \textbf{b} and \textbf{c} are drawn from \texttt{federated.csv}. \tbd{Panel a still awaits the per-site P2 round file.}}
+\sfig{r2_supp_fig23.pdf}{\textbf{Retrieval, distillation and extended ablations.} \textbf{a}, Retrieval-anchored rollouts and distillation. \textbf{b}, Number of treatments. \textbf{c}, Dose support. \textbf{d}, Data regime, including fresh real data each round. \textbf{e}, Site shift. Dashed, one floor unit. Drawn from \texttt{retrieval\_distillation.csv}, \texttt{ablations.csv} and \texttt{shift\_generalisation.csv}.}
+\sfig{r2_supp_fig24.pdf}{\textbf{Security of the audit.} \textbf{a}, The audit score an agent sees when it is scored on the audit set itself. \textbf{b}, The hidden collapse index for the same runs, by audit design. \textbf{c}, Collapse permitted against the number of real pairs reserved for the audit, with gate efficiency $\rho_{AH}$ on the right axis. Panel \textbf{c} is drawn from \texttt{audit\_size.csv}. \tbd{Panels a and b still await audit\_gaming.csv.}}
+
+\sfig{r2_supp_fig25.pdf}{\textbf{D1, the whole mechanism in one dimension.} A single unanchored value whose truth is 1, re-estimated for 20 rounds from $m=5$ noisy self-generated draws, 400 repeats. \textbf{a}, Naive loop. \textbf{b}, Plausibility filter. \textbf{c}, Contrast anchor. \textbf{d}, Retrieved rollouts. \textbf{e}, Full method, which accepts a step only when it improves. \textbf{f}, Mean absolute error for all five. Dotted line, the true value. Simulation, not example data.}
+\sfig{r2_supp_fig26.pdf}{\textbf{D2, two real participants.} Recorded two-hour ranolazine contrasts of the strongest and weakest responder (solid line) with loop trajectories at the measured rollout noise; dashed, the 10 ms reference. \textbf{a}, A responder. \textbf{b}, A non-responder. \textbf{c}, Classification at 10 ms after 15 rounds. Panels a and b use recorded contrasts; panel c is illustrative.}
+\sfig{r2_supp_fig27.pdf}{\textbf{Method components.} \textbf{a}, Each component added in turn; negative $\CCI_K$ means the loop ends better than the base model. \textbf{b}, Leave-one-out from the full method; dashed, the full method. Medians with 2.5--97.5 percentiles. \tbd{Example data until casi\_components.csv is delivered.}}
+\sfig{r2_supp_fig28.pdf}{\textbf{Gain by environment and round.} Contrast gain $G_k$ for the factual-scored loop, the gate alone and the full method; bands, IQR over seeds. Positive means better than the base model. \tbd{Example data until improvement.csv is delivered.}}
+
+\sfig{r2_new_fig4.pdf}{\textbf{Mechanism fingerprint and transport by round.} \textbf{a}, Mean signed error toward the null against the walk SD across masks at round 15, by condition; circles M2, triangles GRU, faint points round 0. A variance walk moves points up; a drift to the null moves them right. \textbf{b}, The two quantities by round for the naive loop and the plausibility verifier. \textbf{c}, Empirical probability that a hidden pair changes 10 ms class at round 15 against its recorded distance from the threshold in floor units, with the walk model projected onto the recorded pairs (dashed). \textbf{d}, Transfer contrast error of frozen round-$k$ models on the independent lower-dose crossover; dotted, the recorded one-shot value. \tbd{Example data until e1\_hidden\_pairs\_rounds.csv and e2\_transfer\_rounds.csv are delivered (TBD C1, C5).}}
+
+\sfig{r2_main_fig2.pdf}{\textbf{The recorded environment.} \textbf{a}, Placebo-corrected $\Delta$QTcF by drug and nominal time; thin lines are the 87 participant--drug trajectories, bold lines the drug means with participant-bootstrap 95\% intervals; dashed line, 10 ms. \textbf{b}, The first preregistered mask: 26 of 87 active periods hidden (red), stratified by drug; placebo periods are never hidden; white, period not recorded. \textbf{c}, Expected absolute measurement error per contrast from replicate variance; the floor (5.42 ms) is 18.5\% of the contrast SD. Inset, replicate counts per cell. \textbf{d}, Recorded two-hour contrasts for all 87 pairs, shaded by the fraction of the 50 masks in which each pair is hidden; grey band, 10 ms $\pm$ one floor. All panels use recorded data.}
+\sfig{r2_main_fig3.pdf}{\textbf{Known-generator loops (E0).} Medians and interquartile ranges over 200 seeds; generator units. \textbf{a}, Hidden-arm contrast MAE by round for mean rollouts and stochastic rollouts with $m=25$, 5 and 1 samples per arm. \textbf{b}, Replacing versus accumulating synthetic data. \textbf{c}, Mean signed error of hidden arms with and without a likelihood plausibility filter; dotted line, the null. \textbf{d}, Contrast anchor at three weights and the audit gate. \textbf{e}, Variance of the hidden parameter against the predicted $k\sigma^2/m$ (dashed). \textbf{f}, Change in factual versus hidden contrast error from round 0 to 20, one point per seed and condition. }
+\sfig{r2_rich_fig2.pdf}{\textbf{Group average versus individual response.} \textbf{a}, One-shot leave-one-participant-out contrast error of reference predictors (grey), group-mean models (teal) and the population concentration--QTc model (orange); recorded. \textbf{b}, The same by drug; labels, ms saved by the individual input. \textbf{c}, Per participant, paired. \textbf{d}, Correlation between predicted and recorded individual deviation on hidden pairs by round, M2 (solid) and GRU (dashed); medians and IQR over masks. \textbf{e}, Standard deviation of a hidden pair's prediction across masks by round; dashed, $\sqrt{c\,k\sigma^2/m}$. \textbf{f}, Per-participant hidden-pair error at round 0 against round 15, M2 without remedy. \textbf{g}, Per-participant $\CCI_{15}$ by condition. \textbf{h}, Each condition placed by collapse (horizontal) and retained personalisation (vertical): preservation is top-left, erasure bottom-left, collapse right; the dashed circle marks where a group-mean-anchored loop should fall. \textbf{i}, What the individual input buys in one shot (recorded) against what each loop condition costs or preserves, in floor units. \tbd{Panels d--i are rendered from example data until e1\_hidden\_pairs\_rounds.csv is delivered (TBD C1, C2.1, H24).}}
+\sfig{r2_main_fig6.pdf}{\textbf{Agentic self-improvement, remedies and transport.} \textbf{a,b}, QT environment, three agents $\times$ five runs per condition: the score each agent saw (a) and the hidden contrast error it never saw (b), relative to iteration 0; red, factual-scored (F); green, contrast-audited (C). \textbf{c}, Goodhart events per run: iterations in which the seen score improved and the hidden score worsened. \textbf{d}, Categories of edit made by the agents. \textbf{e}, Hidden-pair MAE at round 15 against anchor weight; dashed, Proposition~4; red, no anchor; points, medians with IQR over 50 masks. \textbf{f}, Audit-gate acceptance by round. \textbf{g}, Transfer to the independent lower-dose crossover: contrast MAE at round 0 (grey) and round 15 (coloured) with participant-bootstrap 95\% intervals. \tbd{Panels a--d and g redrawn from the delivered runs; panels e--f from the delivered sweep.}}
+
+\bibliographystyle{sn-nature}
+\bibliography{ref,ref_r2_additions}
+\end{document}

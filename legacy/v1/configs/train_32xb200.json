@@ -1,0 +1,14 @@
+{
+  "task": "train",
+  "gpu": "B200",
+  "devices": 32,
+  "parallel": "mask",
+  "env": "cohort",
+  "cohort": "data/e1_qt_cohort.csv",
+  "masks": 32,
+  "seeds": 1,
+  "rounds": 15,
+  "m": 5,
+  "lambda": 1.0,
+  "model": "linear"
+}

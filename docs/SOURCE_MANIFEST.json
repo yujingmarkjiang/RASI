@@ -1,0 +1,22 @@
+{
+  "source_inputs": [
+    {
+      "file": "rasi.zip",
+      "bytes": 68310,
+      "sha256": "1cee219ed31d1ed91746901c87f8de656c8ccf51aa024a23c676c307726c193c"
+    },
+    {
+      "file": "paper_main_R5.tex",
+      "bytes": 76175,
+      "sha256": "15ff6021d1db6213a015c28a30de6b311ee96ab75efdff8e3fe96e785666914a"
+    },
+    {
+      "file": "paper_supp_R5.tex",
+      "bytes": 121044,
+      "sha256": "7667b53ba65508660aa2a0f6eef4a63d154fd9c354dee3743031a3713494abb6"
+    }
+  ],
+  "original_code_archive": "legacy/v1",
+  "original_data": "data/e1_qt_cohort.csv",
+  "scope": "RASI core implementation plus user-facing diagnostics, smoke/unit checks and configuration tooling; no manuscript experiment runner"
+}

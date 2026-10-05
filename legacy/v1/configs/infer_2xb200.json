@@ -1,0 +1,9 @@
+{
+  "task": "infer",
+  "gpu": "B200",
+  "devices": 2,
+  "parallel": "shard",
+  "env": "cohort",
+  "cohort": "data/e1_qt_cohort.csv",
+  "model": "linear"
+}
