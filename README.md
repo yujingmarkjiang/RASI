@@ -1,4 +1,4 @@
-# RASI — manuscript-aligned implementation
+# RASI — Randomisation-Anchored Self Improvement 
 
 RASI implements the manuscript's randomisation-anchored self-improvement loop: it proposes synthetic trajectories from real-neighbour retrieval, verifies them against randomised anchors, retrains a world model, and accepts updates only when a reserved contrast audit improves. The repository provides linear and autoregressive GRU adapters, explicit CPU/CUDA execution, reproducible configuration, checkpoint/resume support, diagnostics, and engineering tests without adding manuscript experiments.
 
